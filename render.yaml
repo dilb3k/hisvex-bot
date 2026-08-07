@@ -1,0 +1,31 @@
+services:
+  - type: worker
+    name: hisvex-bot
+    runtime: node
+    plan: free
+    region: oregon
+    branch: main
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    autoDeploy: true
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: ADMIN_TELEGRAM_IDS
+        sync: false
+      - key: ADMIN_APPROVAL_CHAT_ID
+        sync: false
+      - key: BACKEND_URL
+        value: https://hisvex-prod-api.onrender.com
+      - key: BOT_INTERNAL_SECRET
+        sync: false
+      - key: CARD_NUMBER
+        sync: false
+      - key: CARD_HOLDER_NAME
+        sync: false
+      - key: APP_DOWNLOAD_URL
+        value: https://hisvex-web.vercel.app
+      - key: SUPPORT_TELEGRAM_USERNAME
+        value: dilbek7011
+      - key: REMINDER_DAYS_BEFORE
+        value: "3"
