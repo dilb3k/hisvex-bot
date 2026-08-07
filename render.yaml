@@ -2,7 +2,10 @@ services:
   - type: worker
     name: hisvex-bot
     runtime: node
-    plan: free
+    # Render's free tier only covers web services/static sites — a
+    # background worker (this bot uses long-polling, not a webhook) needs
+    # at least the Starter plan since nothing ever "wakes" it via HTTP.
+    plan: starter
     region: oregon
     branch: main
     buildCommand: npm install && npm run build
