@@ -10,6 +10,16 @@ export const keyboards = {
 
   retry: Markup.inlineKeyboard([Markup.button.callback(texts.retryButton, "retry_link")]),
 
+  // The persistent bottom keyboard — stays visible after it's sent once,
+  // so a linked user always has the menu at hand without hunting for
+  // /start or scrolling back to an old inline-button message.
+  persistentMenu: (isAdmin: boolean) =>
+    Markup.keyboard([
+      [texts.menuButtons.buySubscription],
+      [texts.menuButtons.myAccount, texts.menuButtons.myPayments],
+      ...(isAdmin ? [[texts.menuButtons.help, texts.menuButtons.admin]] : [[texts.menuButtons.help]]),
+    ]).resize(),
+
   mainMenu: (isAdmin: boolean) =>
     Markup.inlineKeyboard([
       [Markup.button.callback(texts.menuButtons.buySubscription, "menu_buy")],

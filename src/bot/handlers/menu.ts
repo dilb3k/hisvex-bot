@@ -3,6 +3,7 @@ import { texts, formatDate, daysLeft } from "../texts";
 import { keyboards } from "../keyboards";
 import { api } from "../../services/api-client";
 import { env } from "../../config/env";
+import { respond, ackIfCallback } from "../respond";
 
 export function isAdmin(telegramId: number | undefined): boolean {
   return !!telegramId && env.ADMIN_TELEGRAM_IDS.includes(String(telegramId));
@@ -20,20 +21,21 @@ export async function showMainMenu(ctx: BotContext) {
 }
 
 export async function handleMenuMain(ctx: BotContext) {
-  await ctx.answerCbQuery();
+  await ackIfCallback(ctx);
   const admin = isAdmin(ctx.from?.id);
-  await ctx.editMessageText(texts.mainMenu, keyboards.mainMenu(admin));
+  await respond(ctx, texts.mainMenu, keyboards.mainMenu(admin));
 }
 
 export async function handleMenuAccount(ctx: BotContext) {
-  await ctx.answerCbQuery();
+  await ackIfCallback(ctx);
   const userId = await requireLinked(ctx);
   if (!userId) return;
 
   try {
     const status = await api.getSubscriptionStatus(userId);
     const left = daysLeft(status.subscriptionEndDate);
-    await ctx.editMessageText(
+    await respond(
+      ctx,
       texts.myAccount(status.username, status.tier, formatDate(status.subscriptionEndDate), left),
       { parse_mode: "HTML", ...keyboards.backToMenu }
     );
@@ -44,6 +46,6 @@ export async function handleMenuAccount(ctx: BotContext) {
 }
 
 export async function handleMenuHelp(ctx: BotContext) {
-  await ctx.answerCbQuery();
-  await ctx.editMessageText(texts.help, { parse_mode: "HTML", ...keyboards.backToMenu });
+  await ackIfCallback(ctx);
+  await respond(ctx, texts.help, { parse_mode: "HTML", ...keyboards.backToMenu });
 }

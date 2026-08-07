@@ -3,16 +3,17 @@ import { texts, formatSom, DURATION_LABEL, TIER_LABEL } from "../texts";
 import { keyboards } from "../keyboards";
 import { api } from "../../services/api-client";
 import { requireLinked } from "./menu";
+import { respond, ackIfCallback } from "../respond";
 
 export async function handleMenuPayments(ctx: BotContext) {
-  await ctx.answerCbQuery();
+  await ackIfCallback(ctx);
   const userId = await requireLinked(ctx);
   if (!userId) return;
 
   try {
     const payments = await api.getPaymentsByUser(userId);
     if (payments.length === 0) {
-      await ctx.editMessageText(`${texts.myPaymentsTitle}\n\n${texts.myPaymentsEmpty}`, {
+      await respond(ctx, `${texts.myPaymentsTitle}\n\n${texts.myPaymentsEmpty}`, {
         parse_mode: "HTML",
         ...keyboards.backToMenu,
       });
@@ -26,7 +27,7 @@ export async function handleMenuPayments(ctx: BotContext) {
       })
       .join("\n");
 
-    await ctx.editMessageText(`${texts.myPaymentsTitle}\n\n${lines}`, {
+    await respond(ctx, `${texts.myPaymentsTitle}\n\n${lines}`, {
       parse_mode: "HTML",
       ...keyboards.backToMenu,
     });

@@ -5,12 +5,14 @@ import { texts } from "../texts";
 import { keyboards } from "../keyboards";
 import { api } from "../../services/api-client";
 import { env } from "../../config/env";
-import { showMainMenu } from "./menu";
+import { showMainMenu, isAdmin } from "./menu";
 
 export async function handleStart(ctx: BotContext) {
   // Already linked in this session — go straight to the menu instead of
-  // asking for the phone number again every time.
+  // asking for the phone number again every time. Re-send the persistent
+  // keyboard too, in case the user cleared it or is on a fresh device.
   if (ctx.session.userId) {
+    await ctx.reply(texts.welcomeBack, keyboards.persistentMenu(isAdmin(ctx.from?.id)));
     return showMainMenu(ctx);
   }
   await ctx.reply(texts.welcome, { parse_mode: "HTML", ...keyboards.requestPhone });
@@ -52,7 +54,12 @@ export async function linkByPhone(ctx: BotContext, phone: string) {
     ctx.session.userId = user.userId;
     ctx.session.username = user.username;
 
-    await ctx.reply(texts.linked(user.username), { parse_mode: "HTML", ...Markup.removeKeyboard() });
+    // Swap the one-time "share phone" keyboard for the persistent menu —
+    // it stays visible for the rest of the chat from here on.
+    await ctx.reply(texts.linked(user.username), {
+      parse_mode: "HTML",
+      ...keyboards.persistentMenu(isAdmin(ctx.from?.id)),
+    });
     await showMainMenu(ctx);
   } catch (err) {
     console.error("linkByPhone failed", err);

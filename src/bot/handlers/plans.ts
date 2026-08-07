@@ -3,9 +3,10 @@ import { texts, formatSom } from "../texts";
 import { keyboards } from "../keyboards";
 import { api, type PlanDuration, type PlanTier } from "../../services/api-client";
 import { requireLinked } from "./menu";
+import { respond, ackIfCallback } from "../respond";
 
 export async function handleMenuBuy(ctx: BotContext) {
-  await ctx.answerCbQuery();
+  await ackIfCallback(ctx);
   const userId = await requireLinked(ctx);
   if (!userId) return;
 
@@ -15,7 +16,7 @@ export async function handleMenuBuy(ctx: BotContext) {
       `${texts.choosePlan}\n\n` +
       `<b>Bor</b>\n${texts.planFeatures(features.bor)}\n\n` +
       `<b>Pro ⭐️</b>\n${texts.planFeatures(features.pro)}`;
-    await ctx.editMessageText(body, { parse_mode: "HTML", ...keyboards.choosePlan });
+    await respond(ctx, body, { parse_mode: "HTML", ...keyboards.choosePlan });
   } catch (err) {
     console.error("handleMenuBuy failed", err);
     await ctx.reply(texts.genericError);
@@ -23,19 +24,19 @@ export async function handleMenuBuy(ctx: BotContext) {
 }
 
 export async function handleChooseTier(ctx: BotContext, tier: PlanTier) {
-  await ctx.answerCbQuery();
-  await ctx.editMessageText(texts.chooseDuration(tier), {
+  await ackIfCallback(ctx);
+  await respond(ctx, texts.chooseDuration(tier), {
     parse_mode: "HTML",
     ...keyboards.chooseDuration(tier),
   });
 }
 
 export async function handleChooseDuration(ctx: BotContext, tier: PlanTier, duration: PlanDuration) {
-  await ctx.answerCbQuery();
+  await ackIfCallback(ctx);
   try {
     const { pricing, clickEnabled } = await api.getPricing();
     const amount = pricing[tier][String(duration)];
-    await ctx.editMessageText(texts.chooseMethod(tier, duration, formatSom(amount)), {
+    await respond(ctx, texts.chooseMethod(tier, duration, formatSom(amount)), {
       parse_mode: "HTML",
       ...keyboards.chooseMethod(tier, duration, clickEnabled),
     });

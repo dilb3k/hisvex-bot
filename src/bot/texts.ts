@@ -40,6 +40,7 @@ export const texts = {
   retryButton: "🔄 Qayta urinish",
   openAppButton: "📲 Ilovani ochish",
   linked: (username: string) => `✅ Hisobingiz bog'landi: <b>${username}</b>`,
+  welcomeBack: "🏠 Xush kelibsiz! Pastdagi menyudan foydalaning 👇",
   mainMenu: "Quyidagilardan birini tanlang:",
   menuButtons: {
     buySubscription: "💳 Obuna sotib olish / uzaytirish",

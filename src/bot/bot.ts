@@ -45,6 +45,15 @@ export function createBot(): Telegraf<BotContext> {
   bot.action("menu_admin", handleMenuAdmin);
   bot.action("menu_buy", handleMenuBuy);
 
+  // Persistent reply-keyboard buttons (bottom menu) — same destinations as
+  // the inline "menu_*" actions above, just triggered by a plain text tap
+  // instead of a callback query.
+  bot.hears(texts.menuButtons.buySubscription, handleMenuBuy);
+  bot.hears(texts.menuButtons.myAccount, handleMenuAccount);
+  bot.hears(texts.menuButtons.myPayments, handleMenuPayments);
+  bot.hears(texts.menuButtons.help, handleMenuHelp);
+  bot.hears(texts.menuButtons.admin, handleMenuAdmin);
+
   bot.action(/^plan_tier_(bor|pro)$/, (ctx) => handleChooseTier(ctx, ctx.match[1] as PlanTier));
 
   bot.action(/^plan_dur_(bor|pro)_(1|6|12)$/, (ctx) =>

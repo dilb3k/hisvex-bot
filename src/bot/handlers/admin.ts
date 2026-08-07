@@ -3,6 +3,7 @@ import { texts, formatDate, formatSom } from "../texts";
 import { keyboards } from "../keyboards";
 import { api } from "../../services/api-client";
 import { isAdmin } from "./menu";
+import { respond, ackIfCallback } from "../respond";
 
 function displayName(ctx: BotContext): string {
   const u = ctx.from;
@@ -72,16 +73,16 @@ async function editApprovalCard(ctx: BotContext, statusLine: string) {
 }
 
 export async function handleMenuAdmin(ctx: BotContext) {
-  await ctx.answerCbQuery();
+  await ackIfCallback(ctx);
   if (!isAdmin(ctx.from?.id)) {
-    await ctx.editMessageText(texts.notAdmin, keyboards.backToMenu);
+    await respond(ctx, texts.notAdmin, keyboards.backToMenu);
     return;
   }
 
   try {
     const pending = await api.getPendingPayments();
     if (pending.length === 0) {
-      await ctx.editMessageText(`${texts.adminPendingList(0)}\n\n${texts.adminPendingEmpty}`, {
+      await respond(ctx, `${texts.adminPendingList(0)}\n\n${texts.adminPendingEmpty}`, {
         parse_mode: "HTML",
         ...keyboards.backToMenu,
       });
@@ -93,7 +94,7 @@ export async function handleMenuAdmin(ctx: BotContext) {
       .map((p) => `• <b>${p.telegramUsername ?? p.telegramUserId}</b> — ${p.tier} / ${p.durationMonths} oy — ${formatSom(p.amount)} — <code>${p.id}</code>`)
       .join("\n");
 
-    await ctx.editMessageText(`${texts.adminPendingList(pending.length)}\n\n${lines}`, {
+    await respond(ctx, `${texts.adminPendingList(pending.length)}\n\n${lines}`, {
       parse_mode: "HTML",
       ...keyboards.backToMenu,
     });
