@@ -81,7 +81,14 @@ export async function handleMenuAdmin(ctx: BotContext) {
 
   try {
     const pending = await api.getPendingPayments();
-    if (pending.length === 0) {
+    // Only manual_card payments wait on an admin's tap here — "pending"
+    // click payments (if any show up mid-webhook) resolve themselves and
+    // were never actionable from this list. Filter before counting, not
+    // after: counting the unfiltered total against a filtered list of rows
+    // showed a header like "3 ta kutilmoqda" above only 1 visible row,
+    // which read as the other 2 having silently vanished.
+    const manualPending = pending.filter((p) => p.method === "manual_card");
+    if (manualPending.length === 0) {
       await respond(ctx, `${texts.adminPendingList(0)}\n\n${texts.adminPendingEmpty}`, {
         parse_mode: "HTML",
         ...keyboards.backToMenu,
@@ -89,12 +96,11 @@ export async function handleMenuAdmin(ctx: BotContext) {
       return;
     }
 
-    const lines = pending
-      .filter((p) => p.method === "manual_card")
+    const lines = manualPending
       .map((p) => `• <b>${p.telegramUsername ?? p.telegramUserId}</b> — ${p.tier} / ${p.durationMonths} oy — ${formatSom(p.amount)} — <code>${p.id}</code>`)
       .join("\n");
 
-    await respond(ctx, `${texts.adminPendingList(pending.length)}\n\n${lines}`, {
+    await respond(ctx, `${texts.adminPendingList(manualPending.length)}\n\n${lines}`, {
       parse_mode: "HTML",
       ...keyboards.backToMenu,
     });
