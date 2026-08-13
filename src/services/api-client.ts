@@ -76,6 +76,13 @@ export const api = {
     });
   },
 
+  lookupUserByTelegramId(telegramId: string): Promise<UserLookup | null> {
+    return unwrap<UserLookup>(http.get(`/lookup-by-telegram/${telegramId}`)).catch((err): UserLookup | null => {
+      if (err instanceof ApiError && err.statusCode === 404) return null;
+      throw err;
+    });
+  },
+
   linkTelegram(userId: string, telegramId: string, telegramUsername?: string): Promise<void> {
     return unwrap(http.post("/link-telegram", { userId, telegramId, telegramUsername })).then(() => undefined);
   },

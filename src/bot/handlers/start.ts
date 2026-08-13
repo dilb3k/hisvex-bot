@@ -5,13 +5,18 @@ import { texts } from "../texts";
 import { keyboards } from "../keyboards";
 import { api } from "../../services/api-client";
 import { env } from "../../config/env";
-import { showMainMenu, isAdmin } from "./menu";
+import { showMainMenu, isAdmin, resolveLinkedUser } from "./menu";
 
 export async function handleStart(ctx: BotContext) {
-  // Already linked in this session — go straight to the menu instead of
-  // asking for the phone number again every time. Re-send the persistent
-  // keyboard too, in case the user cleared it or is on a fresh device.
-  if (ctx.session.userId) {
+  // Already linked — go straight to the menu instead of asking for the phone
+  // number again every time. resolveLinkedUser() also covers a linked user
+  // whose in-memory session was wiped by a bot restart (see its comment in
+  // menu.ts) by re-resolving the durable link from telegramId, so a restart
+  // doesn't put every existing user back through "share your phone number".
+  // Re-send the persistent keyboard too, in case the user cleared it or is
+  // on a fresh device.
+  const linked = await resolveLinkedUser(ctx);
+  if (linked) {
     await ctx.reply(texts.welcomeBack, keyboards.persistentMenu(isAdmin(ctx.from?.id)));
     return showMainMenu(ctx);
   }
