@@ -57,6 +57,7 @@ export type Payment = {
 };
 
 export type ExpiringSoon = {
+  subscriptionId: string;
   userId: string;
   telegramId: string;
   username: string;
@@ -137,5 +138,9 @@ export const api = {
 
   getExpiringSoon(days: number): Promise<ExpiringSoon[]> {
     return unwrap(http.get("/expiring-soon", { params: { days } }));
+  },
+
+  markReminderSent(subscriptionId: string): Promise<{ ok: boolean }> {
+    return unwrap(http.post(`/expiring-soon/${subscriptionId}/mark-reminded`, {}));
   },
 };

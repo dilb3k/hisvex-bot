@@ -24,12 +24,20 @@ export async function handleAdminApprove(ctx: BotContext, paymentId: string) {
     const who = displayName(ctx);
     await editApprovalCard(ctx, texts.adminApproved(who));
 
-    const status = await api.getSubscriptionStatus(payment.userId);
-    await ctx.telegram.sendMessage(
-      payment.telegramUserId,
-      texts.paymentApprovedUser(payment.tier, formatDate(status.subscriptionEndDate)),
-      { parse_mode: "HTML" }
-    );
+    // The approval itself already succeeded and is reflected on the card —
+    // don't let a failed DM (e.g. the user blocked the bot) fall through to
+    // the outer catch and show the admin a misleading "xatolik" alert for
+    // an action that actually went through.
+    try {
+      const status = await api.getSubscriptionStatus(payment.userId);
+      await ctx.telegram.sendMessage(
+        payment.telegramUserId,
+        texts.paymentApprovedUser(payment.tier, formatDate(status.subscriptionEndDate)),
+        { parse_mode: "HTML" }
+      );
+    } catch (notifyErr) {
+      console.error(`Failed to notify user ${payment.telegramUserId} of payment approval`, notifyErr);
+    }
   } catch (err) {
     console.error("handleAdminApprove failed", err);
     await ctx.answerCbQuery(texts.genericError, { show_alert: true });
@@ -49,7 +57,13 @@ export async function handleAdminReject(ctx: BotContext, paymentId: string) {
     const who = displayName(ctx);
     await editApprovalCard(ctx, texts.adminRejected(who));
 
-    await ctx.telegram.sendMessage(payment.telegramUserId, texts.paymentRejectedUser(), { parse_mode: "HTML" });
+    // Same reasoning as handleAdminApprove: the rejection already went
+    // through, so a blocked-bot DM failure shouldn't surface as an error.
+    try {
+      await ctx.telegram.sendMessage(payment.telegramUserId, texts.paymentRejectedUser(), { parse_mode: "HTML" });
+    } catch (notifyErr) {
+      console.error(`Failed to notify user ${payment.telegramUserId} of payment rejection`, notifyErr);
+    }
   } catch (err) {
     console.error("handleAdminReject failed", err);
     await ctx.answerCbQuery(texts.genericError, { show_alert: true });
