@@ -18,6 +18,27 @@ const envSchema = z.object({
   APP_DOWNLOAD_URL: z.string().trim().url().default("https://hisvex-web.vercel.app"),
   SUPPORT_TELEGRAM_USERNAME: z.string().trim().default("dilbek7011"),
   REMINDER_DAYS_BEFORE: z.coerce.number().int().positive().default(3),
+
+  // Set to this service's own public URL to run in webhook mode; leave unset
+  // for long polling.
+  //
+  // Long polling needs a process that is always running, which on Render is
+  // a Worker — and Workers are not part of the free tier, which is what the
+  // $7/month invoice was for. In webhook mode the bot is an ordinary web
+  // service: Telegram POSTs each update to it, so it qualifies for the free
+  // plan. Local development leaves this unset and keeps polling, which needs
+  // no public URL.
+  WEBHOOK_URL: z.string().trim().url().optional(),
+
+  // Telegram will only deliver to the path it was told about, but the path is
+  // still effectively a shared secret — anyone who can guess it can post
+  // fake updates. Defaults to a value derived from the bot token so it is
+  // never a predictable constant.
+  WEBHOOK_PATH: z.string().trim().optional(),
+
+  // Render provides this. The webhook server has to bind it or the deploy is
+  // marked failed for not opening a port.
+  PORT: z.coerce.number().int().positive().default(3000),
 });
 
 const parsed = envSchema.safeParse(process.env);

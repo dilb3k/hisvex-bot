@@ -1,14 +1,20 @@
+# The bot used to be a Worker on the starter plan, which is what the $7/month
+# invoice was for — a long-polling process is never woken by HTTP, so Render's
+# free tier (web services only) could not run it.
+#
+# It runs in webhook mode now: Telegram POSTs each update, which makes it an
+# ordinary web service and therefore free. The trade-off is that a free web
+# service sleeps after 15 minutes idle, so the first message after a quiet
+# spell waits for a cold start, and the reminder cron only fires while the
+# service happens to be awake. Moving to the starter plan removes both.
 services:
-  - type: worker
+  - type: web
     name: hisvex-bot
     runtime: node
-    # Render's free tier only covers web services/static sites — a
-    # background worker (this bot uses long-polling, not a webhook) needs
-    # at least the Starter plan since nothing ever "wakes" it via HTTP.
-    plan: starter
-    region: oregon
+    plan: free
+    region: frankfurt
     branch: main
-    buildCommand: npm install && npm run build
+    buildCommand: npm ci --include=dev && npm run build
     startCommand: npm start
     autoDeploy: true
     envVars:
@@ -18,14 +24,18 @@ services:
         sync: false
       - key: ADMIN_APPROVAL_CHAT_ID
         sync: false
-      - key: BACKEND_URL
-        value: https://hisvex-prod-api.onrender.com
       - key: BOT_INTERNAL_SECRET
         sync: false
       - key: CARD_NUMBER
         sync: false
       - key: CARD_HOLDER_NAME
         sync: false
+      # Must be this service's own public URL. Unset it to fall back to long
+      # polling, which is what local development uses.
+      - key: WEBHOOK_URL
+        value: https://hisvex-bot.onrender.com
+      - key: BACKEND_URL
+        value: https://hisvex-api.onrender.com
       - key: APP_DOWNLOAD_URL
         value: https://hisvex-web.vercel.app
       - key: SUPPORT_TELEGRAM_USERNAME
