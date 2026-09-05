@@ -65,7 +65,7 @@ Fill in:
 - `ADMIN_TELEGRAM_IDS` — comma-separated numeric ids allowed to
   approve/reject payments and see the admin menu.
 - `ADMIN_APPROVAL_CHAT_ID` — where payment receipts get posted (from step 1).
-- `BACKEND_URL` — e.g. `https://hisvex-api.onrender.com` (no trailing
+- `BACKEND_URL` — e.g. `https://hisvex-api-production.up.railway.app` (no trailing
   `/api`, the client adds that).
 - `BOT_INTERNAL_SECRET` — must exactly match the backend's value from step 2.
 - `CARD_NUMBER` / `CARD_HOLDER_NAME` — the card shown for manual transfers.

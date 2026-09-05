@@ -1,6 +1,6 @@
 {
   "name": "hisvex-bot",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Hisvex — Telegram bot for subscription plans, payments (Click + manual card), and expiry reminders",
   "main": "dist/index.js",

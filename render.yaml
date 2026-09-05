@@ -35,7 +35,7 @@ services:
       - key: WEBHOOK_URL
         value: https://hisvex-bot.onrender.com
       - key: BACKEND_URL
-        value: https://hisvex-api.onrender.com
+        value: https://hisvex-api-production.up.railway.app
       - key: APP_DOWNLOAD_URL
         value: https://hisvex-web.vercel.app
       - key: SUPPORT_TELEGRAM_USERNAME
