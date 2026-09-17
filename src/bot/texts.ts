@@ -8,8 +8,8 @@ export const TIER_LABEL: Record<PlanTier, string> = {
 
 export const DURATION_LABEL: Record<PlanDuration, string> = {
   1: "1 oy",
-  6: "6 oy (−6%)",
-  12: "12 oy (−12%)",
+  6: "6 oy (−10%)",
+  12: "12 oy (−20%)",
 };
 
 export function formatSom(amount: number): string {
