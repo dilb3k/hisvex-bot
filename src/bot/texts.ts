@@ -73,6 +73,9 @@ export const texts = {
     `${env.CARD_HOLDER_NAME}\n\n` +
     `To'lovni amalga oshirgach, chek/skrinshotni shu yerga rasm qilib yuboring. ` +
     `Admin tasdiqlagach, obunangiz avtomatik faollashadi.`,
+  noPendingReceipt:
+    "❗️ Hozircha kutilayotgan to'lov topilmadi.\n\n" +
+    "Iltimos, avval tarifni tanlang va \"Karta orqali\" to'lov usulini tanlaganingizdan so'ng chekni qayta yuboring.",
   manualReceiptReceived:
     "✅ Chek qabul qilindi va admin ko'rib chiqishga yuborildi.\n\n" +
     "Odatda bir necha daqiqa ichida tasdiqlanadi. Tasdiqlangach sizga xabar beramiz.",
