@@ -1,12 +1,95 @@
-import axios, { AxiosError } from "axios";
+import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 
 import { env } from "../config/env";
 
+// Primary (Railway) / Backup (Render) — same comp-bar-server codebase
+// deployed twice against the same MongoDB Atlas cluster. On a 502/503/504 or
+// a connection-level failure, the failing request is retried once against
+// the other one; every later request goes straight there until Railway's own
+// /api/health answers again. This assumes both backends really do read the
+// same database — if they don't, failing over serves a different dataset
+// instead of an outage, which would be worse than not failing over at all.
+const PRIMARY_BASE = env.BACKEND_URL.replace(/\/$/, "");
+const BACKUP_BASE = env.BACKEND_BACKUP_URL.replace(/\/$/, "");
+const HEALTH_RECHECK_INTERVAL_MS = 3 * 60 * 1000;
+const DEFAULT_TIMEOUT_MS = 10_000;
+const HEAVY_TIMEOUT_MS = 60_000;
+
+let isPrimaryDown = false;
+let healthRecheckTimer: NodeJS.Timeout | null = null;
+
+function activeBase(): string {
+  return isPrimaryDown ? BACKUP_BASE : PRIMARY_BASE;
+}
+
+function markPrimaryDown() {
+  if (isPrimaryDown) return;
+  isPrimaryDown = true;
+  scheduleHealthRecheck();
+  console.warn("[api-client] Primary (Railway) unreachable — failing over to Render for this and subsequent requests.");
+}
+
+// The bot is a long-running Node process (unlike a serverless client), so a
+// module-level interval is safe for its whole lifetime. Stops itself once
+// primary answers again; a later failure restarts it.
+function scheduleHealthRecheck() {
+  if (healthRecheckTimer) return;
+  healthRecheckTimer = setInterval(async () => {
+    if (!isPrimaryDown) return;
+    try {
+      const res = await axios.get(`${PRIMARY_BASE}/api/health`, { timeout: 5000 });
+      if (res.status === 200) {
+        isPrimaryDown = false;
+        if (healthRecheckTimer) {
+          clearInterval(healthRecheckTimer);
+          healthRecheckTimer = null;
+        }
+        console.log("[api-client] Primary (Railway) is back — switching off Render.");
+      }
+    } catch {
+      // Still down — leave isPrimaryDown as-is, try again next tick.
+    }
+  }, HEALTH_RECHECK_INTERVAL_MS);
+}
+
+// Only a server that's actually unreachable/down should fail over — a 4xx is
+// this bot's own fault (bad input, payment already reviewed) and would fail
+// identically on either backend.
+function isFailoverTriggering(error: AxiosError): boolean {
+  const status = error.response?.status;
+  if (status === 502 || status === 503 || status === 504) return true;
+  // No response reached us at all — a genuine connection failure, not this
+  // client's own request timeout (ECONNABORTED is a slow-but-maybe-alive
+  // server, deliberately excluded: that's not the same as a dead one).
+  if (!error.response && error.code && error.code !== "ECONNABORTED") return true;
+  return false;
+}
+
 const http = axios.create({
-  baseURL: `${env.BACKEND_URL.replace(/\/$/, "")}/api/bot`,
-  timeout: 15_000,
   headers: { "X-Bot-Secret": env.BOT_INTERNAL_SECRET },
 });
+
+http.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  // Set per-request, not baked into the instance at creation, so a failover
+  // that happens mid-run applies to the very next call immediately.
+  config.baseURL = `${activeBase()}/api/bot`;
+  if (config.timeout === undefined) config.timeout = DEFAULT_TIMEOUT_MS;
+  return config;
+});
+
+http.interceptors.response.use(
+  (response) => response,
+  async (error: AxiosError) => {
+    const originalRequest = error.config as (InternalAxiosRequestConfig & { _failoverRetried?: boolean }) | undefined;
+    if (originalRequest && !originalRequest._failoverRetried && isFailoverTriggering(error)) {
+      originalRequest._failoverRetried = true;
+      markPrimaryDown();
+      originalRequest.baseURL = `${BACKUP_BASE}/api/bot`;
+      return http(originalRequest);
+    }
+    return Promise.reject(error);
+  },
+);
 
 export class ApiError extends Error {
   constructor(message: string, public statusCode?: number) {
@@ -24,10 +107,53 @@ function unwrap<T>(promise: Promise<{ data: { success: boolean; data: T } }>): P
     });
 }
 
+// Aborts a fetch that's taking longer than `timeoutMs` — Node's fetch has no
+// built-in timeout option, only the AbortController escape hatch.
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Same failover shape as the `http` axios interceptor above, hand-rolled for
+// fetch: try the currently-active backend, and on a 502/503/504 or a genuine
+// connection failure (not our own AbortController timeout — that's "slow",
+// not "down"), retry once against whichever backend wasn't just tried. If
+// that one was already the backup (isPrimaryDown was already true walking
+// in), there's nothing left to fall back to and the failure is real.
+async function fetchWithFailover(path: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+  const firstBase = activeBase();
+  let res: Response;
+  try {
+    res = await fetchWithTimeout(`${firstBase}${path}`, init, timeoutMs);
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") throw err;
+    if (firstBase === BACKUP_BASE) throw err;
+    markPrimaryDown();
+    return fetchWithTimeout(`${BACKUP_BASE}${path}`, init, timeoutMs);
+  }
+
+  if ((res.status === 502 || res.status === 503 || res.status === 504) && firstBase !== BACKUP_BASE) {
+    markPrimaryDown();
+    return fetchWithTimeout(`${BACKUP_BASE}${path}`, init, timeoutMs);
+  }
+
+  return res;
+}
+
 // The receipt endpoint takes a real image file (multipart/form-data), which
 // the shared `http` axios instance above isn't set up for — everything else
 // is JSON. Built on the platform's own `fetch`/`FormData`/`Blob` instead of
 // pulling in a multipart-encoding dependency just for this one call.
+//
+// `form` (and the Blob wrapping the receipt buffer) is a plain in-memory
+// object, not a one-shot Node stream — reusing the same FormData instance
+// for a second fetch() call if the first attempt fails over is safe; nothing
+// here is consumed/destroyed by the first request.
 async function postMultipart<T>(
   path: string,
   fields: Record<string, string>,
@@ -39,11 +165,11 @@ async function postMultipart<T>(
 
   let res: Response;
   try {
-    res = await fetch(`${env.BACKEND_URL.replace(/\/$/, "")}/api/bot${path}`, {
+    res = await fetchWithFailover(`/api/bot${path}`, {
       method: "POST",
       headers: { "X-Bot-Secret": env.BOT_INTERNAL_SECRET },
       body: form,
-    });
+    }, HEAVY_TIMEOUT_MS);
   } catch (err) {
     throw new ApiError(err instanceof Error ? err.message : "Network error");
   }

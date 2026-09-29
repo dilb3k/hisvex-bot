@@ -12,6 +12,11 @@ const envSchema = z.object({
     .transform((v) => v.split(",").map((id) => id.trim()).filter(Boolean)),
   ADMIN_APPROVAL_CHAT_ID: z.string().trim().min(1, "ADMIN_APPROVAL_CHAT_ID is required"),
   BACKEND_URL: z.string().trim().url(),
+  // comp-bar-server deployed a second time on Render as a standby, reading
+  // the same MongoDB Atlas cluster as BACKEND_URL — see api-client.ts's
+  // failover logic. Its own BOT_INTERNAL_SECRET must match this bot's, or a
+  // request that fails over there gets rejected by botAuth instead of served.
+  BACKEND_BACKUP_URL: z.string().trim().url().default("https://hisvex-api.onrender.com"),
   BOT_INTERNAL_SECRET: z.string().trim().min(16, "BOT_INTERNAL_SECRET must match the backend's value"),
   CARD_NUMBER: z.string().trim().min(1),
   CARD_HOLDER_NAME: z.string().trim().min(1),
