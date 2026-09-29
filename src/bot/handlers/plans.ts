@@ -11,11 +11,11 @@ export async function handleMenuBuy(ctx: BotContext) {
   if (!userId) return;
 
   try {
-    const { features } = await api.getPricing();
+    const { features, pricing } = await api.getPricing();
     const body =
       `${texts.choosePlan}\n\n` +
-      `<b>Bor</b>\n${texts.planFeatures(features.bor)}\n\n` +
-      `<b>Pro ⭐️</b>\n${texts.planFeatures(features.pro)}`;
+      `<b>Bor</b>\n${texts.planFeatures(features.bor)}\n${texts.planPricing(pricing.bor)}\n\n` +
+      `<b>Pro ⭐️</b>\n${texts.planFeatures(features.pro)}\n${texts.planPricing(pricing.pro)}`;
     await respond(ctx, body, { parse_mode: "HTML", ...keyboards.choosePlan });
   } catch (err) {
     console.error("handleMenuBuy failed", err);

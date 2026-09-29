@@ -82,6 +82,13 @@ export const texts = {
   choosePlan: "Qaysi tarifni tanlaysiz?",
   chooseDuration: (tier: PlanTier) => `<b>${TIER_LABEL[tier]}</b> tarifi — muddatni tanlang:`,
   planFeatures: (features: string[]) => features.map((f) => `✓ ${f}`).join("\n"),
+  // Shown right on the tier-choice screen (handleMenuBuy) so the discount
+  // for 6/12 months is visible before the user commits to a tier — they
+  // used to only see it one tap later, after already choosing "Bor"/"Pro".
+  planPricing: (pricing: Record<string, number>) =>
+    ([1, 6, 12] as PlanDuration[])
+      .map((d) => `   ${DURATION_LABEL[d]} — <b>${formatSom(pricing[String(d)])}</b>`)
+      .join("\n"),
   chooseMethod: (tier: PlanTier, duration: PlanDuration, amount: string) =>
     `<b>${TIER_LABEL[tier]}</b> — ${DURATION_LABEL[duration]}\n💰 Narxi: <b>${amount}</b>\n\nTo'lov usulini tanlang:`,
   methodClick: "⚡️ Click orqali (avtomatik)",
