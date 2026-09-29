@@ -1,6 +1,6 @@
 import { Markup } from "telegraf";
 
-import { texts, TIER_LABEL, DURATION_LABEL } from "./texts";
+import { texts, TIER_LABEL, DURATION_LABEL, formatSom } from "./texts";
 import type { PlanDuration, PlanTier } from "../services/api-client";
 
 export const keyboards = {
@@ -35,11 +35,14 @@ export const keyboards = {
     [Markup.button.callback(texts.back, "menu_main")],
   ]),
 
-  chooseDuration: (tier: PlanTier) =>
+  // Price is baked into each button's own label (not just the message text
+  // above it) so the cost of a tap is visible without reading elsewhere —
+  // one less thing between "interested" and "paying".
+  chooseDuration: (tier: PlanTier, pricing: Record<string, number>) =>
     Markup.inlineKeyboard([
-      [Markup.button.callback(DURATION_LABEL[1], `plan_dur_${tier}_1`)],
-      [Markup.button.callback(DURATION_LABEL[6], `plan_dur_${tier}_6`)],
-      [Markup.button.callback(DURATION_LABEL[12], `plan_dur_${tier}_12`)],
+      [Markup.button.callback(`${DURATION_LABEL[1]} — ${formatSom(pricing["1"])}`, `plan_dur_${tier}_1`)],
+      [Markup.button.callback(`${DURATION_LABEL[6]} — ${formatSom(pricing["6"])}`, `plan_dur_${tier}_6`)],
+      [Markup.button.callback(`${DURATION_LABEL[12]} — ${formatSom(pricing["12"])}`, `plan_dur_${tier}_12`)],
       [Markup.button.callback(texts.back, "menu_buy")],
     ]),
 

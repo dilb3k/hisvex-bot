@@ -14,8 +14,12 @@ export async function handleMenuBuy(ctx: BotContext) {
     const { features, pricing } = await api.getPricing();
     const body =
       `${texts.choosePlan}\n\n` +
-      `<b>Bor</b>\n${texts.planFeatures(features.bor)}\n${texts.planPricing(pricing.bor)}\n\n` +
-      `<b>Pro ⭐️</b>\n${texts.planFeatures(features.pro)}\n${texts.planPricing(pricing.pro)}`;
+      `${texts.planDivider}\n` +
+      `<b>💼 Bor</b>\n${texts.planFeatures(features.bor)}\n\n${texts.planPricing(pricing.bor)}\n` +
+      `${texts.planDivider}\n` +
+      `<b>⭐️ Pro</b>\n${texts.planFeatures(features.pro)}\n\n${texts.planPricing(pricing.pro)}\n` +
+      `${texts.planDivider}\n\n` +
+      texts.choosePlanFooter;
     await respond(ctx, body, { parse_mode: "HTML", ...keyboards.choosePlan });
   } catch (err) {
     console.error("handleMenuBuy failed", err);
@@ -25,10 +29,16 @@ export async function handleMenuBuy(ctx: BotContext) {
 
 export async function handleChooseTier(ctx: BotContext, tier: PlanTier) {
   await ackIfCallback(ctx);
-  await respond(ctx, texts.chooseDuration(tier), {
-    parse_mode: "HTML",
-    ...keyboards.chooseDuration(tier),
-  });
+  try {
+    const { pricing } = await api.getPricing();
+    await respond(ctx, texts.chooseDuration(tier), {
+      parse_mode: "HTML",
+      ...keyboards.chooseDuration(tier, pricing[tier]),
+    });
+  } catch (err) {
+    console.error("handleChooseTier failed", err);
+    await ctx.reply(texts.genericError);
+  }
 }
 
 export async function handleChooseDuration(ctx: BotContext, tier: PlanTier, duration: PlanDuration) {

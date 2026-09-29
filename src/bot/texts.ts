@@ -79,15 +79,31 @@ export const texts = {
   },
   accountBuyCta: "💳 Obuna sotib olish",
   accountRenewCta: "💳 Obunani uzaytirish",
-  choosePlan: "Qaysi tarifni tanlaysiz?",
-  chooseDuration: (tier: PlanTier) => `<b>${TIER_LABEL[tier]}</b> tarifi — muddatni tanlang:`,
+  choosePlan: "🎯 <b>Qaysi tarif sizga mos?</b>\n\nIkkalasi ham to'liq offline ishlaydi — farqi imkoniyatlarda:",
+  planDivider: "━━━━━━━━━━━━━━",
+  choosePlanFooter: "👇 Tarifni tanlang va bugunoq boshlang!",
+  chooseDuration: (tier: PlanTier) =>
+    `<b>${TIER_LABEL[tier]}</b> tarifi tanlandi ✅\n\nQancha muddatga olasiz? Uzoqroq muddat — ko'proq tejash:`,
   planFeatures: (features: string[]) => features.map((f) => `✓ ${f}`).join("\n"),
   // Shown right on the tier-choice screen (handleMenuBuy) so the discount
   // for 6/12 months is visible before the user commits to a tier — they
   // used to only see it one tap later, after already choosing "Bor"/"Pro".
+  // 6/12-month rows also show the crossed-out full price and the exact
+  // so'm saved, not just the "%" already baked into DURATION_LABEL — a
+  // concrete number is a stronger nudge than a percentage alone.
   planPricing: (pricing: Record<string, number>) =>
     ([1, 6, 12] as PlanDuration[])
-      .map((d) => `   ${DURATION_LABEL[d]} — <b>${formatSom(pricing[String(d)])}</b>`)
+      .map((d) => {
+        const price = pricing[String(d)];
+        if (d === 1) {
+          return `   • ${DURATION_LABEL[d]} — <b>${formatSom(price)}</b>`;
+        }
+        const fullPrice = pricing["1"] * d;
+        const savings = fullPrice - price;
+        const strike = savings > 0 ? `<s>${formatSom(fullPrice)}</s> ` : "";
+        const savingsNote = savings > 0 ? `\n     💸 <i>${formatSom(savings)} tejaysiz</i>` : "";
+        return `   • ${DURATION_LABEL[d]} — ${strike}<b>${formatSom(price)}</b>${savingsNote}`;
+      })
       .join("\n"),
   chooseMethod: (tier: PlanTier, duration: PlanDuration, amount: string) =>
     `<b>${TIER_LABEL[tier]}</b> — ${DURATION_LABEL[duration]}\n💰 Narxi: <b>${amount}</b>\n\nTo'lov usulini tanlang:`,
