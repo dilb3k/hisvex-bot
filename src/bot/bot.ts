@@ -18,7 +18,7 @@ import {
   recoverCardDetailsPaymentId,
 } from "./handlers/receipt";
 import { handleMenuAdmin, handleAdminApprove, handleAdminReject } from "./handlers/admin";
-import { handleMenuPayments } from "./handlers/payments";
+import { handleMenuPayments, handleCheckPaymentStatus } from "./handlers/payments";
 
 export function createBot(): Telegraf<BotContext> {
   const bot = new Telegraf<BotContext>(env.BOT_TOKEN);
@@ -115,6 +115,7 @@ export function createBot(): Telegraf<BotContext> {
   );
 
   bot.action(/^no_receipt_(.+)$/, (ctx) => handleNoReceipt(ctx, ctx.match[1]));
+  bot.action(/^check_payment_(.+)$/, (ctx) => handleCheckPaymentStatus(ctx, ctx.match[1]));
 
   bot.action(/^admin_approve_(.+)$/, (ctx) => handleAdminApprove(ctx, ctx.match[1]));
   bot.action(/^admin_reject_(.+)$/, (ctx) => handleAdminReject(ctx, ctx.match[1]));

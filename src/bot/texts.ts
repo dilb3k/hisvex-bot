@@ -49,14 +49,36 @@ export const texts = {
     help: "🆘 Yordam",
     admin: "🛠 Admin panel",
   },
-  myAccount: (username: string, tier: string, endDate: string, left: number | null) => {
-    const tierLine =
-      tier === "tekin"
-        ? "Tarif: <b>Tekin</b>"
-        : `Tarif: <b>${tier === "pro" ? "Pro" : "Bor"}</b>\nAmal qilish muddati: <b>${endDate}</b>` +
-          (left !== null ? `\nQoldi: <b>${left} kun</b>` : "");
-    return `📊 <b>${username}</b>\n\n${tierLine}`;
+  myAccount: (input: {
+    username: string;
+    tier: string;
+    endDate: string;
+    left: number | null;
+    lastPayment?: { amount: string; date: string } | null;
+  }) => {
+    const { username, tier, endDate, left, lastPayment } = input;
+    let tierLine: string;
+
+    if (tier === "tekin") {
+      tierLine =
+        "Tarif: <b>Tekin</b>\n\n" +
+        "💎 Bor yoki Pro tarifga o'tib, ko'proq imkoniyatlardan foydalaning!";
+    } else {
+      tierLine = `Tarif: <b>${tier === "pro" ? "Pro" : "Bor"}</b>\nAmal qilish muddati: <b>${endDate}</b>`;
+      if (left !== null) {
+        tierLine += `\nQoldi: <b>${left} kun</b>`;
+      }
+      if (left !== null && left <= 3) {
+        const dueLine = left > 0 ? `${left} kundan so'ng tugaydi` : "muddati tugagan";
+        tierLine += `\n\n⚠️ Obunangiz ${dueLine} — uzaytirishni unutmang!`;
+      }
+    }
+
+    const lastPaymentLine = lastPayment ? `\n\n🧾 Oxirgi to'lov: <b>${lastPayment.amount}</b>, ${lastPayment.date}` : "";
+    return `📊 <b>${username}</b>\n\n${tierLine}${lastPaymentLine}`;
   },
+  accountBuyCta: "💳 Obuna sotib olish",
+  accountRenewCta: "💳 Obunani uzaytirish",
   choosePlan: "Qaysi tarifni tanlaysiz?",
   chooseDuration: (tier: PlanTier) => `<b>${TIER_LABEL[tier]}</b> tarifi — muddatni tanlang:`,
   planFeatures: (features: string[]) => features.map((f) => `✓ ${f}`).join("\n"),
@@ -81,18 +103,25 @@ export const texts = {
   cardDetailsInvalid:
     "❗️ Tushunmadim. Iltimos, karta raqami va F.I.Sh.ni vergul bilan ajratib, bitta xabarda yuboring.\n\n" +
     "Masalan: <code>8600 1234 5678 9012, Aliyev Vali</code>",
-  cardDetailsSubmitted:
-    "✅ Ma'lumotlaringiz qabul qilindi va admin ko'rib chiqishga yuborildi.\n\n" +
-    "Odatda bir necha daqiqa ichida tasdiqlanadi. Tasdiqlangach sizga xabar beramiz.",
   noPendingReceipt:
     "❗️ Hozircha kutilayotgan to'lov topilmadi.\n\n" +
     "Iltimos, avval tarifni tanlang va \"Karta orqali\" to'lov usulini tanlaganingizdan so'ng chekni qayta yuboring.",
+  receiptChecking: "⏳ Chekingiz tekshirilmoqda, biroz kuting...",
+  // Appended to every "submitted, waiting on admin" confirmation below —
+  // kept as one shared line instead of copy-pasted into each so the three
+  // messages can't drift out of sync with each other.
+  nextStepHint:
+    "\n\nAdmin javobini shu botda xabar sifatida olasiz. Holatni istalgan payt " +
+    "\"🧾 To'lovlarim\" bo'limidan yoki pastdagi tugma orqali tekshirishingiz mumkin.",
   manualReceiptReceived:
     "✅ Chek qabul qilindi va admin ko'rib chiqishga yuborildi.\n\n" +
     "Odatda bir necha daqiqa ichida tasdiqlanadi. Tasdiqlangach sizga xabar beramiz.",
   receiptProvisioned:
     "✅ <b>To'lovingiz dastlabki tekshiruvdan o'tdi va tarifingiz vaqtincha faollashtirildi!</b>\n\n" +
     "To'lov yakuniy tekshiruvdan so'ng admin tomonidan to'liq tasdiqlanadi.",
+  cardDetailsSubmitted:
+    "✅ Ma'lumotlaringiz qabul qilindi va admin ko'rib chiqishga yuborildi.\n\n" +
+    "Odatda bir necha daqiqa ichida tasdiqlanadi. Tasdiqlangach sizga xabar beramiz.",
   duplicateReceipt:
     `⚠️ Bu chek rasmi allaqachon boshqa to'lov uchun ishlatilgan.\n\n` +
     `Agar bu xato deb hisoblasangiz, @${env.SUPPORT_TELEGRAM_USERNAME} ga murojaat qiling.`,
@@ -157,12 +186,25 @@ export const texts = {
   myPaymentsEmpty: "Hozircha to'lovlar yo'q.",
   paymentStatusLabel: {
     pending: "⏳ Kutilmoqda",
-    provisioned: "🟡 Vaqtincha faollashtirilgan",
+    provisioned: "🔶 Vaqtincha faollashtirilgan — admin tasdiqlashini kutmoqda",
     approved: "✅ Tasdiqlangan",
     completed: "✅ Bajarilgan",
     rejected: "❌ Rad etilgan",
     cancelled: "⚪️ Bekor qilingan",
   } as Record<string, string>,
+  checkStatusButton: "🔄 Holatni tekshirish",
+  checkStatusResult: (p: { status: string; rejectedReason?: string | null }) => {
+    const label = texts.paymentStatusLabel[p.status] ?? p.status;
+    const detail =
+      p.status === "rejected" && p.rejectedReason
+        ? `\n\nSabab: ${p.rejectedReason}`
+        : p.status === "pending"
+          ? "\n\nAdministrator hali ko'rib chiqmagan. Iltimos, biroz kuting."
+          : p.status === "completed" || p.status === "approved"
+            ? "\n\nTabriklaymiz, to'lovingiz tasdiqlangan!"
+            : "";
+    return `${label}${detail}`;
+  },
   help:
     "🆘 <b>Yordam</b>\n\n" +
     `Savol yoki muammo bo'lsa: @${env.SUPPORT_TELEGRAM_USERNAME}\n\n` +

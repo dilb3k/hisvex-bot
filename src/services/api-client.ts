@@ -101,6 +101,7 @@ export type Payment = {
   receiptImageUrl?: string | null;
   ocr?: PaymentOcrResult | null;
   senderCardDetails?: PaymentSenderCardDetails | null;
+  rejectedReason?: string | null;
   merchantTransId?: string;
   createdAt: string;
 };

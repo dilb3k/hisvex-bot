@@ -62,6 +62,10 @@ export async function handlePhoto(ctx: BotContext) {
     return;
   }
 
+  // OCR can take a few seconds, especially on a cold start — let the user
+  // know right away so the bot doesn't look stuck.
+  await ctx.reply(texts.receiptChecking);
+
   try {
     const fileLink = await ctx.telegram.getFileLink(fileId);
     const fileRes = await fetch(fileLink);
@@ -74,7 +78,8 @@ export async function handlePhoto(ctx: BotContext) {
     });
     ctx.session.awaitingReceiptFor = undefined;
 
-    await ctx.reply(provisioned ? texts.receiptProvisioned : texts.manualReceiptReceived, { parse_mode: "HTML" });
+    const resultText = (provisioned ? texts.receiptProvisioned : texts.manualReceiptReceived) + texts.nextStepHint;
+    await ctx.reply(resultText, { parse_mode: "HTML", ...keyboards.paymentSubmittedActions(pending.paymentId) });
 
     // The receipt is already attached (and, if matched, the tier already
     // granted) and the user has been told so above — don't let a failure
@@ -156,7 +161,10 @@ export async function handleCardDetailsText(ctx: BotContext, paymentId: string) 
     const payment = await api.submitCardDetails(paymentId, parsed.cardNumber, parsed.fullName);
     ctx.session.awaitingCardInfoFor = undefined;
 
-    await ctx.reply(texts.cardDetailsSubmitted, { parse_mode: "HTML" });
+    await ctx.reply(texts.cardDetailsSubmitted + texts.nextStepHint, {
+      parse_mode: "HTML",
+      ...keyboards.paymentSubmittedActions(paymentId),
+    });
 
     // Same reasoning as handlePhoto's admin-notify block: the submission
     // already succeeded and the user's been told, so a failure here

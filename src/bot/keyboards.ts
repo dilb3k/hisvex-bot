@@ -50,10 +50,32 @@ export const keyboards = {
       [Markup.button.callback(texts.back, `plan_tier_${tier}`)],
     ]),
 
-  clickPayLink: (url: string) => Markup.inlineKeyboard([[Markup.button.url(texts.clickPayButton, url)]]),
+  clickPayLink: (url: string) =>
+    Markup.inlineKeyboard([
+      [Markup.button.url(texts.clickPayButton, url)],
+      [Markup.button.callback(texts.back, "menu_main")],
+    ]),
 
   manualCardActions: (paymentId: string) =>
-    Markup.inlineKeyboard([[Markup.button.callback(texts.noReceiptButton, `no_receipt_${paymentId}`)]]),
+    Markup.inlineKeyboard([
+      [Markup.button.callback(texts.noReceiptButton, `no_receipt_${paymentId}`)],
+      [Markup.button.callback(texts.back, "menu_main")],
+    ]),
+
+  // Attached to the three "submitted, waiting on admin" confirmations
+  // (screenshot accepted, provisioned, card-details submitted) — lets the
+  // user check in without having to dig through "🧾 To'lovlarim".
+  paymentSubmittedActions: (paymentId: string) =>
+    Markup.inlineKeyboard([
+      [Markup.button.callback(texts.checkStatusButton, `check_payment_${paymentId}`)],
+      [Markup.button.callback(texts.back, "menu_main")],
+    ]),
+
+  accountActions: (ctaLabel: string | null) =>
+    Markup.inlineKeyboard([
+      ...(ctaLabel ? [[Markup.button.callback(ctaLabel, "menu_buy")]] : []),
+      [Markup.button.callback(texts.back, "menu_main")],
+    ]),
 
   adminPaymentActions: (paymentId: string) =>
     Markup.inlineKeyboard([
