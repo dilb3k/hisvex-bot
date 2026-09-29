@@ -64,8 +64,12 @@ export async function handlePayManual(ctx: BotContext, tier: PlanTier, duration:
     });
 
     ctx.session.awaitingReceiptFor = { paymentId: payment.id, tier, durationMonths: duration };
+    ctx.session.awaitingCardInfoFor = undefined;
 
-    await ctx.editMessageText(texts.manualCardInstructions(formatSom(amount)), { parse_mode: "HTML" });
+    await ctx.editMessageText(texts.manualCardInstructions(formatSom(amount)), {
+      parse_mode: "HTML",
+      ...keyboards.manualCardActions(payment.id),
+    });
   } catch (err) {
     console.error("handlePayManual failed", err);
     await ctx.reply(texts.genericError);

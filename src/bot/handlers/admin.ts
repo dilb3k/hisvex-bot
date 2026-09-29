@@ -1,7 +1,7 @@
 import type { BotContext } from "../context";
 import { texts, formatDate, formatSom } from "../texts";
 import { keyboards } from "../keyboards";
-import { api } from "../../services/api-client";
+import { api, ApiError } from "../../services/api-client";
 import { isAdmin } from "./menu";
 import { respond, ackIfCallback } from "../respond";
 
@@ -39,6 +39,13 @@ export async function handleAdminApprove(ctx: BotContext, paymentId: string) {
       console.error(`Failed to notify user ${payment.telegramUserId} of payment approval`, notifyErr);
     }
   } catch (err) {
+    if (err instanceof ApiError && err.statusCode === 400) {
+      // The 48h auto-expire cron (or another admin, in a race) already
+      // moved this payment out of "pending"/"provisioned" — nothing left to
+      // approve, and it's not this admin's fault, so no "xatolik" alert.
+      await ctx.answerCbQuery(texts.adminAlreadyReviewed, { show_alert: true });
+      return;
+    }
     console.error("handleAdminApprove failed", err);
     await ctx.answerCbQuery(texts.genericError, { show_alert: true });
   }
@@ -51,7 +58,7 @@ export async function handleAdminReject(ctx: BotContext, paymentId: string) {
   }
 
   try {
-    const payment = await api.rejectPayment(paymentId, String(ctx.from!.id));
+    const { payment, wasDowngraded } = await api.rejectPayment(paymentId, String(ctx.from!.id));
     await ctx.answerCbQuery("❌");
 
     const who = displayName(ctx);
@@ -59,12 +66,20 @@ export async function handleAdminReject(ctx: BotContext, paymentId: string) {
 
     // Same reasoning as handleAdminApprove: the rejection already went
     // through, so a blocked-bot DM failure shouldn't surface as an error.
+    // A "provisioned" payment had already granted the tier on trust (OCR
+    // match) — wasDowngraded tells us that got taken back, which the user
+    // needs to be told explicitly rather than the plain rejection message.
     try {
-      await ctx.telegram.sendMessage(payment.telegramUserId, texts.paymentRejectedUser(), { parse_mode: "HTML" });
+      const message = wasDowngraded ? texts.paymentRejectedDowngraded : texts.paymentRejectedUser();
+      await ctx.telegram.sendMessage(payment.telegramUserId, message, { parse_mode: "HTML" });
     } catch (notifyErr) {
       console.error(`Failed to notify user ${payment.telegramUserId} of payment rejection`, notifyErr);
     }
   } catch (err) {
+    if (err instanceof ApiError && err.statusCode === 400) {
+      await ctx.answerCbQuery(texts.adminAlreadyReviewed, { show_alert: true });
+      return;
+    }
     console.error("handleAdminReject failed", err);
     await ctx.answerCbQuery(texts.genericError, { show_alert: true });
   }

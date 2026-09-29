@@ -8,6 +8,10 @@ export interface SessionData {
   // so the next photo message they send is understood as a receipt for
   // this specific pending payment rather than a random image.
   awaitingReceiptFor?: { paymentId: string; tier: PlanTier; durationMonths: PlanDuration };
+  // Set when the user taps "Skrinshot qila olmadim / Chek yo'q" instead of
+  // sending a receipt photo, so the next text message they send is
+  // understood as "<card number>, <full name>" for this payment.
+  awaitingCardInfoFor?: string | null;
 }
 
 export interface BotContext extends Context {

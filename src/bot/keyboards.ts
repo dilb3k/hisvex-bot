@@ -52,6 +52,9 @@ export const keyboards = {
 
   clickPayLink: (url: string) => Markup.inlineKeyboard([[Markup.button.url(texts.clickPayButton, url)]]),
 
+  manualCardActions: (paymentId: string) =>
+    Markup.inlineKeyboard([[Markup.button.callback(texts.noReceiptButton, `no_receipt_${paymentId}`)]]),
+
   adminPaymentActions: (paymentId: string) =>
     Markup.inlineKeyboard([
       [

@@ -73,16 +73,43 @@ export const texts = {
     `${env.CARD_HOLDER_NAME}\n\n` +
     `To'lovni amalga oshirgach, chek/skrinshotni shu yerga rasm qilib yuboring. ` +
     `Admin tasdiqlagach, obunangiz avtomatik faollashadi.`,
+  noReceiptButton: "❓ Skrinshot qila olmadim / Chek yo'q",
+  askCardDetails:
+    "Muammo emas — qaysi karta raqamidan to'lov qildingiz va F.I.Sh.ingizni yozing.\n\n" +
+    "Ikkalasini bitta xabarda, vergul bilan ajratib yuboring, masalan:\n" +
+    "<code>8600 1234 5678 9012, Aliyev Vali</code>",
+  cardDetailsInvalid:
+    "❗️ Tushunmadim. Iltimos, karta raqami va F.I.Sh.ni vergul bilan ajratib, bitta xabarda yuboring.\n\n" +
+    "Masalan: <code>8600 1234 5678 9012, Aliyev Vali</code>",
+  cardDetailsSubmitted:
+    "✅ Ma'lumotlaringiz qabul qilindi va admin ko'rib chiqishga yuborildi.\n\n" +
+    "Odatda bir necha daqiqa ichida tasdiqlanadi. Tasdiqlangach sizga xabar beramiz.",
   noPendingReceipt:
     "❗️ Hozircha kutilayotgan to'lov topilmadi.\n\n" +
     "Iltimos, avval tarifni tanlang va \"Karta orqali\" to'lov usulini tanlaganingizdan so'ng chekni qayta yuboring.",
   manualReceiptReceived:
     "✅ Chek qabul qilindi va admin ko'rib chiqishga yuborildi.\n\n" +
     "Odatda bir necha daqiqa ichida tasdiqlanadi. Tasdiqlangach sizga xabar beramiz.",
+  receiptProvisioned:
+    "✅ <b>To'lovingiz dastlabki tekshiruvdan o'tdi va tarifingiz vaqtincha faollashtirildi!</b>\n\n" +
+    "To'lov yakuniy tekshiruvdan so'ng admin tomonidan to'liq tasdiqlanadi.",
+  duplicateReceipt:
+    `⚠️ Bu chek rasmi allaqachon boshqa to'lov uchun ishlatilgan.\n\n` +
+    `Agar bu xato deb hisoblasangiz, @${env.SUPPORT_TELEGRAM_USERNAME} ga murojaat qiling.`,
   paymentApprovedUser: (tier: PlanTier, endDate: string) =>
     `🎉 To'lovingiz tasdiqlandi!\n\nTarifingiz: <b>${TIER_LABEL[tier]}</b>\nAmal qilish muddati: <b>${endDate}</b> gacha.`,
   paymentRejectedUser: (reason?: string) =>
     `❌ To'lovingiz rad etildi.${reason ? `\n\nSabab: ${reason}` : ""}\n\nSavolingiz bo'lsa, /help orqali murojaat qiling.`,
+  // A "provisioned" payment already granted the tier on trust (OCR match) —
+  // rejecting it takes that back, so this needs to say so explicitly rather
+  // than the plain paymentRejectedUser message.
+  paymentRejectedDowngraded:
+    "❌ To'lovingiz rad etildi va tarifingiz avvalgi holatga (bepul) qaytarildi.\n\n" +
+    "Savolingiz bo'lsa, /help orqali murojaat qiling.",
+  adminOcrLine: (ocr: { extractedAmount: number | null; transactionRef: string | null; amountMatched: boolean }) =>
+    `\n\n🔎 OCR summa: <b>${ocr.extractedAmount !== null ? formatSom(ocr.extractedAmount) : "aniqlanmadi"}</b> ` +
+    `(mos keldi: ${ocr.amountMatched ? "ha ✅" : "yo'q"})` +
+    (ocr.transactionRef ? `\nTranzaksiya: <code>${ocr.transactionRef}</code>` : ""),
   adminNewPaymentCaption: (input: {
     username: string;
     telegramUsername?: string;
@@ -90,16 +117,36 @@ export const texts = {
     duration: PlanDuration;
     amount: string;
     paymentId: string;
+    ocr?: { extractedAmount: number | null; transactionRef: string | null; amountMatched: boolean } | null;
   }) =>
     `🆕 <b>Yangi to'lov (karta orqali)</b>\n\n` +
     `Foydalanuvchi: <b>${input.username}</b>${input.telegramUsername ? ` (@${input.telegramUsername})` : ""}\n` +
     `Tarif: <b>${TIER_LABEL[input.tier]}</b> — ${DURATION_LABEL[input.duration]}\n` +
     `Summa: <b>${input.amount}</b>\n` +
+    `To'lov ID: <code>${input.paymentId}</code>` +
+    (input.ocr ? texts.adminOcrLine(input.ocr) : ""),
+  adminCardDetailsCaption: (input: {
+    username: string;
+    telegramUsername?: string;
+    tier: PlanTier;
+    duration: PlanDuration;
+    amount: string;
+    paymentId: string;
+    cardNumber: string;
+    fullName: string;
+  }) =>
+    `🆕 <b>Yangi to'lov (chek yo'q — karta ma'lumoti)</b>\n\n` +
+    `Foydalanuvchi: <b>${input.username}</b>${input.telegramUsername ? ` (@${input.telegramUsername})` : ""}\n` +
+    `Tarif: <b>${TIER_LABEL[input.tier]}</b> — ${DURATION_LABEL[input.duration]}\n` +
+    `Summa: <b>${input.amount}</b>\n` +
+    `Yuboruvchi karta: <code>${input.cardNumber}</code>\n` +
+    `F.I.Sh: <b>${input.fullName}</b>\n` +
     `To'lov ID: <code>${input.paymentId}</code>`,
   adminApproveButton: "✅ Tasdiqlash",
   adminRejectButton: "❌ Rad etish",
   adminApproved: (byWhom: string) => `✅ Tasdiqlandi (${byWhom})`,
   adminRejected: (byWhom: string) => `❌ Rad etildi (${byWhom})`,
+  adminAlreadyReviewed: "ℹ️ Bu to'lov allaqachon ko'rib chiqilgan (avtomatik bekor qilingan yoki boshqa admin tomonidan).",
   adminPendingList: (count: number) => `🛠 <b>Kutilayotgan to'lovlar:</b> ${count}`,
   adminPendingEmpty: "Kutilayotgan to'lovlar yo'q.",
   reminderMessage: (tier: string, endDate: string, left: number) =>
@@ -110,6 +157,7 @@ export const texts = {
   myPaymentsEmpty: "Hozircha to'lovlar yo'q.",
   paymentStatusLabel: {
     pending: "⏳ Kutilmoqda",
+    provisioned: "🟡 Vaqtincha faollashtirilgan",
     approved: "✅ Tasdiqlangan",
     completed: "✅ Bajarilgan",
     rejected: "❌ Rad etilgan",

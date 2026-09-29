@@ -24,6 +24,38 @@ function unwrap<T>(promise: Promise<{ data: { success: boolean; data: T } }>): P
     });
 }
 
+// The receipt endpoint takes a real image file (multipart/form-data), which
+// the shared `http` axios instance above isn't set up for — everything else
+// is JSON. Built on the platform's own `fetch`/`FormData`/`Blob` instead of
+// pulling in a multipart-encoding dependency just for this one call.
+async function postMultipart<T>(
+  path: string,
+  fields: Record<string, string>,
+  file: { buffer: Buffer; filename: string; contentType: string }
+): Promise<T> {
+  const form = new FormData();
+  for (const [key, value] of Object.entries(fields)) form.append(key, value);
+  form.append("receipt", new Blob([new Uint8Array(file.buffer)], { type: file.contentType }), file.filename);
+
+  let res: Response;
+  try {
+    res = await fetch(`${env.BACKEND_URL.replace(/\/$/, "")}/api/bot${path}`, {
+      method: "POST",
+      headers: { "X-Bot-Secret": env.BOT_INTERNAL_SECRET },
+      body: form,
+    });
+  } catch (err) {
+    throw new ApiError(err instanceof Error ? err.message : "Network error");
+  }
+
+  const json = (await res.json().catch(() => null)) as { success: boolean; data?: T; error?: { message?: string } } | null;
+
+  if (!res.ok || !json?.success) {
+    throw new ApiError(json?.error?.message ?? `Backend error (${res.status})`, res.status);
+  }
+  return json.data as T;
+}
+
 export type PlanTier = "bor" | "pro";
 export type PlanDuration = 1 | 6 | 12;
 
@@ -41,6 +73,18 @@ export type UserLookup = {
   subscriptionEndDate: string | null;
 };
 
+export type PaymentOcrResult = {
+  extractedAmount: number | null;
+  extractedText: string | null;
+  transactionRef: string | null;
+  amountMatched: boolean;
+};
+
+export type PaymentSenderCardDetails = {
+  cardNumber: string;
+  fullName: string;
+};
+
 export type Payment = {
   id: string;
   userId: string;
@@ -50,8 +94,13 @@ export type Payment = {
   durationMonths: PlanDuration;
   amount: number;
   method: "click" | "manual_card";
-  status: "pending" | "approved" | "rejected" | "completed" | "cancelled";
+  // "provisioned" = OCR matched the amount and the tier was already granted
+  // on trust, pending a human's later sign-off (see attachReceipt below).
+  status: "pending" | "provisioned" | "approved" | "rejected" | "completed" | "cancelled";
   receiptFileId?: string;
+  receiptImageUrl?: string | null;
+  ocr?: PaymentOcrResult | null;
+  senderCardDetails?: PaymentSenderCardDetails | null;
   merchantTransId?: string;
   createdAt: string;
 };
@@ -102,15 +151,34 @@ export const api = {
     return unwrap(http.post("/payments/manual", input));
   },
 
-  attachReceipt(paymentId: string, receiptFileId: string): Promise<Payment> {
-    return unwrap(http.post(`/payments/${paymentId}/receipt`, { receiptFileId }));
+  attachReceipt(
+    paymentId: string,
+    receiptFileId: string,
+    file: { buffer: Buffer; contentType: string }
+  ): Promise<{ payment: Payment; provisioned: boolean }> {
+    return postMultipart(`/payments/${paymentId}/receipt`, { receiptFileId }, {
+      buffer: file.buffer,
+      filename: "receipt.jpg",
+      contentType: file.contentType,
+    });
+  },
+
+  // Screenshot-free flow: the user types the card they sent from + their
+  // name instead of forwarding a screenshot. No OCR runs on this path —
+  // status stays "pending" for an admin to review by hand.
+  submitCardDetails(paymentId: string, cardNumber: string, fullName: string): Promise<Payment> {
+    return unwrap(http.post(`/payments/${paymentId}/card-details`, { cardNumber, fullName }));
   },
 
   approvePayment(paymentId: string, approvedByTelegramId: string): Promise<Payment> {
     return unwrap(http.post(`/payments/${paymentId}/approve`, { approvedByTelegramId }));
   },
 
-  rejectPayment(paymentId: string, rejectedByTelegramId: string, reason?: string): Promise<Payment> {
+  rejectPayment(
+    paymentId: string,
+    rejectedByTelegramId: string,
+    reason?: string
+  ): Promise<{ payment: Payment; wasDowngraded: boolean }> {
     return unwrap(http.post(`/payments/${paymentId}/reject`, { rejectedByTelegramId, reason }));
   },
 
