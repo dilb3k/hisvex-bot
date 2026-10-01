@@ -30,7 +30,7 @@ export async function handleContact(ctx: BotContext) {
   // A user could theoretically forward someone ELSE's contact card instead
   // of sharing their own — only trust it if Telegram says it's the sender's
   // own contact (contact.user_id matches the sender).
-  if (contact.user_id && contact.user_id !== ctx.from?.id) {
+  if (ctx.chat?.type !== "private" || !contact.user_id || contact.user_id !== ctx.from?.id) {
     await ctx.reply(texts.genericError, Markup.removeKeyboard());
     return;
   }
@@ -38,7 +38,7 @@ export async function handleContact(ctx: BotContext) {
   await linkByPhone(ctx, contact.phone_number);
 }
 
-export async function linkByPhone(ctx: BotContext, phone: string) {
+async function linkByPhone(ctx: BotContext, phone: string) {
   try {
     const user = await api.lookupUserByPhone(phone);
     if (!user) {
@@ -55,7 +55,7 @@ export async function linkByPhone(ctx: BotContext, phone: string) {
       return;
     }
 
-    await api.linkTelegram(user.userId, String(ctx.from!.id), ctx.from?.username);
+    await api.linkTelegram(user.userId, String(ctx.from!.id), ctx.from?.username, phone);
     ctx.session.userId = user.userId;
     ctx.session.username = user.username;
 

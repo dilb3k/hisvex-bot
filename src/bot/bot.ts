@@ -7,7 +7,7 @@ import { emptySession } from "./context";
 import { texts } from "./texts";
 import type { PlanDuration, PlanTier } from "../services/api-client";
 
-import { handleStart, handleContact, handleRetryLink, linkByPhone } from "./handlers/start";
+import { handleStart, handleContact, handleRetryLink } from "./handlers/start";
 import { handleMenuMain, handleMenuAccount, handleMenuHelp } from "./handlers/menu";
 import { handleMenuBuy, handleChooseTier, handleChooseDuration, handlePayManual, handlePayClick } from "./handlers/plans";
 import {
@@ -77,7 +77,7 @@ export function createBot(): Telegraf<BotContext> {
     const text = ctx.message.text.trim();
     const digits = text.replace(/\D/g, "");
     if (!ctx.session.userId && digits.length >= 9 && digits.length <= 13) {
-      await linkByPhone(ctx, text);
+      await ctx.reply("Telefon raqamini yozish egalikni tasdiqlamaydi. O‘zingizning kontaktingizni tugma orqali yuboring.", (await import("./keyboards")).keyboards.requestPhone);
       return;
     }
     return next();

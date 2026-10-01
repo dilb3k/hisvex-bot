@@ -75,7 +75,7 @@ export async function handlePhoto(ctx: BotContext) {
     const { payment, provisioned } = await api.attachReceipt(pending.paymentId, fileId, {
       buffer,
       contentType: "image/jpeg",
-    });
+    },String(ctx.from!.id));
     ctx.session.awaitingReceiptFor = undefined;
 
     const resultText = (provisioned ? texts.receiptProvisioned : texts.manualReceiptReceived) + texts.nextStepHint;
@@ -158,7 +158,7 @@ export async function handleCardDetailsText(ctx: BotContext, paymentId: string) 
   }
 
   try {
-    const payment = await api.submitCardDetails(paymentId, parsed.cardNumber, parsed.fullName);
+    const payment = await api.submitCardDetails(paymentId, parsed.cardNumber, parsed.fullName, String(ctx.from!.id));
     ctx.session.awaitingCardInfoFor = undefined;
 
     await ctx.reply(texts.cardDetailsSubmitted + texts.nextStepHint, {
