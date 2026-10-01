@@ -73,7 +73,7 @@ http.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   // Set per-request, not baked into the instance at creation, so a failover
   // that happens mid-run applies to the very next call immediately.
   config.baseURL = `${activeBase()}/api/bot`;
-  if (config.timeout === undefined) config.timeout = DEFAULT_TIMEOUT_MS;
+  if (!config.timeout) config.timeout = DEFAULT_TIMEOUT_MS;
   return config;
 });
 
@@ -81,7 +81,7 @@ http.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as (InternalAxiosRequestConfig & { _failoverRetried?: boolean }) | undefined;
-    if (originalRequest && !originalRequest._failoverRetried && isFailoverTriggering(error)) {
+    if (originalRequest && ["get","head","options"].includes((originalRequest.method??"get").toLowerCase()) && !originalRequest._failoverRetried && isFailoverTriggering(error)) {
       originalRequest._failoverRetried = true;
       markPrimaryDown();
       originalRequest.baseURL = `${BACKUP_BASE}/api/bot`;
@@ -127,17 +127,18 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: numbe
 // in), there's nothing left to fall back to and the failure is real.
 async function fetchWithFailover(path: string, init: RequestInit, timeoutMs: number): Promise<Response> {
   const firstBase = activeBase();
+  const replayable = ["GET","HEAD","OPTIONS"].includes((init.method??"GET").toUpperCase());
   let res: Response;
   try {
     res = await fetchWithTimeout(`${firstBase}${path}`, init, timeoutMs);
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") throw err;
-    if (firstBase === BACKUP_BASE) throw err;
+    if (!replayable || firstBase === BACKUP_BASE) throw err;
     markPrimaryDown();
     return fetchWithTimeout(`${BACKUP_BASE}${path}`, init, timeoutMs);
   }
 
-  if ((res.status === 502 || res.status === 503 || res.status === 504) && firstBase !== BACKUP_BASE) {
+  if (replayable && (res.status === 502 || res.status === 503 || res.status === 504) && firstBase !== BACKUP_BASE) {
     markPrimaryDown();
     return fetchWithTimeout(`${BACKUP_BASE}${path}`, init, timeoutMs);
   }
@@ -260,8 +261,8 @@ export const api = {
     });
   },
 
-  linkTelegram(userId: string, telegramId: string, telegramUsername?: string): Promise<void> {
-    return unwrap(http.post("/link-telegram", { userId, telegramId, telegramUsername })).then(() => undefined);
+  linkTelegram(userId: string, telegramId: string, telegramUsername: string | undefined, verifiedPhone: string): Promise<void> {
+    return unwrap(http.post("/link-telegram", { userId, telegramId, telegramUsername, verifiedPhone, contactTelegramId:telegramId })).then(() => undefined);
   },
 
   getSubscriptionStatus(userId: string): Promise<UserLookup> {
@@ -281,9 +282,10 @@ export const api = {
   attachReceipt(
     paymentId: string,
     receiptFileId: string,
-    file: { buffer: Buffer; contentType: string }
+    file: { buffer: Buffer; contentType: string },
+    telegramUserId:string,
   ): Promise<{ payment: Payment; provisioned: boolean }> {
-    return postMultipart(`/payments/${paymentId}/receipt`, { receiptFileId }, {
+    return postMultipart(`/payments/${paymentId}/receipt`, { receiptFileId, telegramUserId }, {
       buffer: file.buffer,
       filename: "receipt.jpg",
       contentType: file.contentType,
@@ -293,8 +295,8 @@ export const api = {
   // Screenshot-free flow: the user types the card they sent from + their
   // name instead of forwarding a screenshot. No OCR runs on this path —
   // status stays "pending" for an admin to review by hand.
-  submitCardDetails(paymentId: string, cardNumber: string, fullName: string): Promise<Payment> {
-    return unwrap(http.post(`/payments/${paymentId}/card-details`, { cardNumber, fullName }));
+  submitCardDetails(paymentId: string, cardNumber: string, fullName: string, telegramUserId:string): Promise<Payment> {
+    return unwrap(http.post(`/payments/${paymentId}/card-details`, { cardNumber, fullName, telegramUserId }));
   },
 
   approvePayment(paymentId: string, approvedByTelegramId: string): Promise<Payment> {
@@ -335,7 +337,7 @@ export const api = {
     return unwrap(http.get("/expiring-soon", { params: { days } }));
   },
 
-  markReminderSent(subscriptionId: string): Promise<{ ok: boolean }> {
-    return unwrap(http.post(`/expiring-soon/${subscriptionId}/mark-reminded`, {}));
+  markReminderSent(subscriptionId: string, expectedEndDate:string): Promise<{ ok: boolean }> {
+    return unwrap(http.post(`/expiring-soon/${subscriptionId}/mark-reminded`, {expectedEndDate}));
   },
 };

@@ -42,7 +42,7 @@ export async function runReminders(bot: Telegraf<BotContext>) {
         // tomorrow, not a missed one — never let it fail the send we already
         // succeeded at.
         try {
-          await api.markReminderSent(sub.subscriptionId);
+          await api.markReminderSent(sub.subscriptionId, sub.subscriptionEndDate);
         } catch (markErr) {
           console.error(`Failed to mark reminder sent for subscription ${sub.subscriptionId}`, markErr);
         }
