@@ -32,3 +32,20 @@ test('Axios zero timeout gets a deadline; only reads fail over; receipt uploads 
  const fresh=apiHarness();await assert.rejects(fresh.api.attachReceipt('p','file',{buffer:Buffer.from('image'),contentType:'image/png'},'123'))
  assert.equal(fresh.fetchCalls(),1)
 })
+
+test('Railway platform 404 fails over once while business 404 and write 404 keep their original outcome',async()=>{
+ const platform={status:404,data:{status:'error',code:404,message:'Application not found',request_id:'fixture'},headers:{}};
+ const read=apiHarness();await read.handlers.fail({config:{method:'get',url:'/pricing'},response:platform});assert.equal(read.requests.length,1);
+ const header=apiHarness();await header.handlers.fail({config:{method:'get',url:'/pricing'},response:{status:404,data:'not found',headers:{'x-railway-router':'edge'}}});assert.equal(header.requests.length,1);
+ const business=apiHarness();await assert.rejects(business.handlers.fail({config:{method:'get'},response:{status:404,data:{success:false,error:{message:'Mahsulot topilmadi'}},headers:{}}}));assert.equal(business.requests.length,0);
+ const write=apiHarness();await assert.rejects(write.handlers.fail({config:{method:'post'},response:platform}));assert.equal(write.requests.length,0);
+});
+test('a business envelope cannot trigger failover by including the Railway marker',async()=>{
+ const h=apiHarness();await assert.rejects(h.handlers.fail({config:{method:'get'},response:{status:404,data:{success:false,error:{message:'Application not found'}},headers:{'x-railway-router':'edge'}}}));assert.equal(h.requests.length,0);
+});
+test('write outage marks Render for the next explicit request and never replays the failed write',async()=>{
+ const h=apiHarness(),config=h.handlers.request({method:'post',url:'/payments/manual',timeout:0});
+ await assert.rejects(h.handlers.fail({config,response:{status:404,data:{status:'error',message:'Application not found'},headers:{}}}));assert.equal(h.requests.length,0);
+ assert.equal(h.handlers.request({method:'post',timeout:0}).baseURL,'https://backup.test/api/bot');
+ await assert.rejects(h.handlers.fail({config:h.handlers.request({method:'get',timeout:0}),response:{status:503}}));assert.equal(h.requests.length,0,'active backup is never retried against itself');
+});

@@ -10,3 +10,22 @@ admin-backup*.json
 *.backup
 
 .claude/settings.local.json
+
+# Local credentials and private key material
+credentials*.json
+service-account*.json
+*backup*.json
+*.pem
+*.key
+*.p12
+*.p8
+*.jks
+*.keystore
+*.mobileprovision
+
+# Generated audit and test reports
+/audit/
+/test-artifacts/
+test-results/
+playwright-report/
+coverage/

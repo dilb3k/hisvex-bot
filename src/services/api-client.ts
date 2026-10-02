@@ -57,12 +57,22 @@ function scheduleHealthRecheck() {
 // identically on either backend.
 function isFailoverTriggering(error: AxiosError): boolean {
   const status = error.response?.status;
+  if (status === 404 && isRailwayPlatformNotFound(error.response?.headers, error.response?.data)) return true;
   if (status === 502 || status === 503 || status === 504) return true;
   // No response reached us at all — a genuine connection failure, not this
   // client's own request timeout (ECONNABORTED is a slow-but-maybe-alive
   // server, deliberately excluded: that's not the same as a dead one).
   if (!error.response && error.code && error.code !== "ECONNABORTED") return true;
   return false;
+}
+
+function isRailwayPlatformNotFound(headers: any, body: unknown): boolean {
+  let appBody = body;
+  if (typeof appBody === 'string') { try { appBody = JSON.parse(appBody); } catch {} }
+  if (appBody && typeof appBody === 'object' && typeof (appBody as {success?:unknown}).success === 'boolean') return false;
+  if (headers?.['x-railway-router']) return true;
+  const text = typeof body === 'string' ? body : JSON.stringify(body ?? '');
+  return text.length <= 16_384 && text.includes('Application not found');
 }
 
 const http = axios.create({
@@ -81,12 +91,13 @@ http.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as (InternalAxiosRequestConfig & { _failoverRetried?: boolean }) | undefined;
-    if (originalRequest && ["get","head","options"].includes((originalRequest.method??"get").toLowerCase()) && !originalRequest._failoverRetried && isFailoverTriggering(error)) {
+    if (originalRequest && !isPrimaryDown && ["get","head","options"].includes((originalRequest.method??"get").toLowerCase()) && !originalRequest._failoverRetried && isFailoverTriggering(error)) {
       originalRequest._failoverRetried = true;
       markPrimaryDown();
       originalRequest.baseURL = `${BACKUP_BASE}/api/bot`;
       return http(originalRequest);
     }
+    if (originalRequest?.baseURL === `${PRIMARY_BASE}/api/bot` && isFailoverTriggering(error)) markPrimaryDown();
     return Promise.reject(error);
   },
 );
@@ -133,14 +144,17 @@ async function fetchWithFailover(path: string, init: RequestInit, timeoutMs: num
     res = await fetchWithTimeout(`${firstBase}${path}`, init, timeoutMs);
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") throw err;
-    if (!replayable || firstBase === BACKUP_BASE) throw err;
+    if (firstBase === BACKUP_BASE) throw err;
     markPrimaryDown();
+    if (!replayable) throw err;
     return fetchWithTimeout(`${BACKUP_BASE}${path}`, init, timeoutMs);
   }
 
-  if (replayable && (res.status === 502 || res.status === 503 || res.status === 504) && firstBase !== BACKUP_BASE) {
+  const platform404 = res.status === 404 && firstBase !== BACKUP_BASE &&
+    isRailwayPlatformNotFound(Object.fromEntries(res.headers), await res.clone().text());
+  if ((platform404 || res.status === 502 || res.status === 503 || res.status === 504) && firstBase !== BACKUP_BASE) {
     markPrimaryDown();
-    return fetchWithTimeout(`${BACKUP_BASE}${path}`, init, timeoutMs);
+    if (replayable) return fetchWithTimeout(`${BACKUP_BASE}${path}`, init, timeoutMs);
   }
 
   return res;
