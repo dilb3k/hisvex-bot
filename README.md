@@ -81,10 +81,21 @@ npm run dev      # local development, auto-reloads
 npm run build && npm start   # production
 ```
 
-The bot uses long-polling (`bot.launch()`), not a webhook — no public URL
-or port needs to be exposed for the bot itself. Deploy it anywhere that can
-run a long-lived Node process (Render Background Worker, a small VPS,
-etc.) — same platform as `comp-bar-server` is the simplest choice.
+With `WEBHOOK_URL` set to this service's public URL, the bot runs in webhook
+mode on `PORT` (provided by Render). Without `WEBHOOK_URL`, local development
+uses long polling and does not open an HTTP server.
+
+In webhook mode, unauthenticated `GET /health` returns HTTP 200 with
+`{"status":"ok","service":"hisvex-bot"}`. This checks process liveness only:
+it does not call Telegram, MongoDB, or the backend. The response is not cached
+and contains no configuration or secrets. All other non-webhook requests,
+including `GET /`, keep returning HTTP 403; the secret Telegram webhook path
+and its POST filter stay unchanged.
+
+After deploying, point UptimeRobot's HTTP monitor at
+`https://hisvex-bot-bzzg.onrender.com/health` using GET, without authentication.
+`render.yaml` also sets Render's `healthCheckPath` to `/health`; for services
+managed manually, set the same Health Check Path in the Render dashboard.
 
 ## 5. (Optional) Enable Click
 

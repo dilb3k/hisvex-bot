@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { env } from "./config/env";
 import { createBot } from "./bot/bot";
 import { startReminderCron } from "./cron/reminders";
+import { webhookFallback } from "./http/webhook-fallback";
 
 /**
  * Secret path Telegram posts updates to.
@@ -40,6 +41,7 @@ async function main() {
         domain: env.WEBHOOK_URL,
         hookPath: path,
         port: env.PORT,
+        cb: webhookFallback,
       },
     });
     console.log(
