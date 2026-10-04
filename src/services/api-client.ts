@@ -257,6 +257,8 @@ export type ExpiringSoon = {
 };
 
 export const api = {
+  requestPasswordReset: (telegramId: string) =>
+    unwrap<{ resetUrl: string; expiresAt: string }>(http.post("/password-reset", { telegramId })),
   startRegistration: (startToken: string, telegramId: string) =>
     unwrap<{ verified: boolean }>(http.post("/registration/start", { startToken, telegramId })),
   confirmRegistration: (telegramId: string, contactUserId: string, phone: string, telegramUsername?: string) =>

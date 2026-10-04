@@ -6,11 +6,13 @@ import { keyboards } from "../keyboards";
 import { api } from "../../services/api-client";
 import { env } from "../../config/env";
 import { showMainMenu, isAdmin, resolveLinkedUser } from "./menu";
+import { handlePasswordReset } from "./password-reset";
 
 export async function handleStart(ctx: BotContext) {
   if (ctx.chat?.type !== "private" || !ctx.from) return;
   ctx.session.awaitingCardInfoFor = undefined;
   const payload = (ctx.message as { text?: string } | undefined)?.text?.trim().split(/\s+/)[1];
+  if (payload === "reset_password") return handlePasswordReset(ctx);
   if (payload?.startsWith("reg_")) {
     try {
       const result = await api.startRegistration(payload.slice(4), String(ctx.from.id));

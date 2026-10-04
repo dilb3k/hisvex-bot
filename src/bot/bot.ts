@@ -19,6 +19,7 @@ import {
 } from "./handlers/receipt";
 import { handleMenuAdmin, handleAdminApprove, handleAdminReject } from "./handlers/admin";
 import { handleMenuPayments, handleCheckPaymentStatus } from "./handlers/payments";
+import { handlePasswordReset } from "./handlers/password-reset";
 
 export function createBot(): Telegraf<BotContext> {
   const bot = new Telegraf<BotContext>(env.BOT_TOKEN);
@@ -26,6 +27,7 @@ export function createBot(): Telegraf<BotContext> {
   bot.use(session({ defaultSession: emptySession }));
 
   bot.start(handleStart);
+  bot.command("reset_password", handlePasswordReset);
   bot.help((ctx) => ctx.reply(texts.help, { parse_mode: "HTML" }));
 
   bot.on(message("contact"), handleContact);
@@ -42,6 +44,7 @@ export function createBot(): Telegraf<BotContext> {
     texts.menuButtons.myPayments,
     texts.menuButtons.help,
     texts.menuButtons.admin,
+    texts.menuButtons.resetPassword,
   ]);
 
   // Screenshot-free flow: a text message is "<card number>, <full name>"
@@ -90,6 +93,7 @@ export function createBot(): Telegraf<BotContext> {
   bot.action("menu_help", handleMenuHelp);
   bot.action("menu_admin", handleMenuAdmin);
   bot.action("menu_buy", handleMenuBuy);
+  bot.action("menu_reset_password", handlePasswordReset);
 
   // Persistent reply-keyboard buttons (bottom menu) — same destinations as
   // the inline "menu_*" actions above, just triggered by a plain text tap
@@ -99,6 +103,7 @@ export function createBot(): Telegraf<BotContext> {
   bot.hears(texts.menuButtons.myPayments, handleMenuPayments);
   bot.hears(texts.menuButtons.help, handleMenuHelp);
   bot.hears(texts.menuButtons.admin, handleMenuAdmin);
+  bot.hears(texts.menuButtons.resetPassword, handlePasswordReset);
 
   bot.action(/^plan_tier_(bor|pro)$/, (ctx) => handleChooseTier(ctx, ctx.match[1] as PlanTier));
 

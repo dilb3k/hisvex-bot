@@ -17,6 +17,7 @@ export const keyboards = {
     Markup.keyboard([
       [texts.menuButtons.buySubscription],
       [texts.menuButtons.myAccount, texts.menuButtons.myPayments],
+      [texts.menuButtons.resetPassword],
       ...(isAdmin ? [[texts.menuButtons.help, texts.menuButtons.admin]] : [[texts.menuButtons.help]]),
     ]).resize(),
 
@@ -25,6 +26,7 @@ export const keyboards = {
       [Markup.button.callback(texts.menuButtons.buySubscription, "menu_buy")],
       [Markup.button.callback(texts.menuButtons.myAccount, "menu_account")],
       [Markup.button.callback(texts.menuButtons.myPayments, "menu_payments")],
+      [Markup.button.callback(texts.menuButtons.resetPassword, "menu_reset_password")],
       [Markup.button.callback(texts.menuButtons.help, "menu_help")],
       ...(isAdmin ? [[Markup.button.callback(texts.menuButtons.admin, "menu_admin")]] : []),
     ]),
@@ -76,6 +78,7 @@ export const keyboards = {
 
   accountActions: (ctaLabel: string | null) =>
     Markup.inlineKeyboard([
+      [Markup.button.callback(texts.menuButtons.resetPassword, "menu_reset_password")],
       ...(ctaLabel ? [[Markup.button.callback(ctaLabel, "menu_buy")]] : []),
       [Markup.button.callback(texts.back, "menu_main")],
     ]),

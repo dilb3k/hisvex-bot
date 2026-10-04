@@ -48,10 +48,15 @@ export const texts = {
   linked: (username: string) => `✅ Hisobingiz bog'landi: <b>${escapeTelegramHtml(username)}</b>`,
   welcomeBack: "🏠 Xush kelibsiz! Pastdagi menyudan foydalaning 👇",
   mainMenu: "Quyidagilardan birini tanlang:",
+  passwordResetReady: "🔐 Yangi parol qo‘yish uchun quyidagi tugmani bosing. Havola 10 daqiqa amal qiladi va faqat bir marta ishlaydi. Uni hech kimga yubormang. Parolni shu chatga yozmang — ochilgan formaga kiriting. Parol yangilangach eski seanslar yopiladi.",
+  passwordResetOpen: "🔐 Yangi parol qo‘yish",
+  passwordResetNotLinked: "Hisobingizni tiklash uchun avval shu Telegram hisobini ulang: o‘zingizning kontaktingizni quyidagi tugma orqali yuboring. Keyin menyudagi «Parolni tiklash»ni bosing. Bir nechta hisob bog‘langan bo‘lsa, yordamga murojaat qiling.",
+  passwordResetWait: "Yangi havola olish uchun 1 daqiqa kutib, «Parolni tiklash»ni qayta bosing.",
   menuButtons: {
     buySubscription: "💳 Obuna sotib olish / uzaytirish",
     myAccount: "📊 Mening hisobim",
     myPayments: "🧾 To'lovlarim",
+    resetPassword: "🔐 Parolni tiklash",
     help: "🆘 Yordam",
     admin: "🛠 Admin panel",
   },
@@ -237,7 +242,7 @@ export const texts = {
   help:
     "🆘 <b>Yordam</b>\n\n" +
     `Savol yoki muammo bo'lsa: @${env.SUPPORT_TELEGRAM_USERNAME}\n\n` +
-    "Buyruqlar:\n/start — bosh menyu\n/help — yordam",
+    "Buyruqlar:\n/start — bosh menyu\n/reset_password — unutilgan parolni tiklash\n/help — yordam",
   genericError: "❗️ Xatolik yuz berdi. Birozdan so'ng qayta urinib ko'ring yoki /help orqali murojaat qiling.",
   notAdmin: "Bu bo'lim faqat administratorlar uchun.",
   back: "◀️ Orqaga",
