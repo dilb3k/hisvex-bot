@@ -1,6 +1,11 @@
 import { env } from "../config/env";
 import type { PlanDuration, PlanTier } from "../services/api-client";
 
+// Usernames, OCR and rejection notes are text, never Telegram HTML markup.
+export function escapeTelegramHtml(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 export const TIER_LABEL: Record<PlanTier, string> = {
   bor: "Bor",
   pro: "Pro",
@@ -32,14 +37,15 @@ export const texts = {
   welcome:
     "🍸 <b>Hisvex botiga xush kelibsiz!</b>\n\n" +
     "Bu bot orqali obunangizni sotib olish, uzaytirish va to'lov holatini kuzatib borishingiz mumkin.\n\n" +
-    "Davom etish uchun telefon raqamingizni yuboring — u Hisvex hisobingizga bog'lanadi.",
+    "Hisvex hisobingizni ulash va kirish kodlarini olish uchun pastdagi “Telefon raqamni yuborish” tugmasini bosing.\n\n" +
+    "Ilovada ro‘yxatdan o‘tgan telefon raqamingizdan foydalaning. Faqat Start bosish hisobni ulash uchun yetarli emas.",
   requestPhoneButton: "📱 Telefon raqamni yuborish",
   userNotFound: (phone: string) =>
-    `❗️ ${phone} raqami bilan ro'yxatdan o'tgan Hisvex hisobi topilmadi.\n\n` +
+    `❗️ ${escapeTelegramHtml(phone)} raqami bilan ro'yxatdan o'tgan Hisvex hisobi topilmadi.\n\n` +
     `Avval ilovada ro'yxatdan o'ting, so'ng shu tugmani qayta bosing.`,
   retryButton: "🔄 Qayta urinish",
   openAppButton: "📲 Ilovani ochish",
-  linked: (username: string) => `✅ Hisobingiz bog'landi: <b>${username}</b>`,
+  linked: (username: string) => `✅ Hisobingiz bog'landi: <b>${escapeTelegramHtml(username)}</b>`,
   welcomeBack: "🏠 Xush kelibsiz! Pastdagi menyudan foydalaning 👇",
   mainMenu: "Quyidagilardan birini tanlang:",
   menuButtons: {
@@ -75,7 +81,7 @@ export const texts = {
     }
 
     const lastPaymentLine = lastPayment ? `\n\n🧾 Oxirgi to'lov: <b>${lastPayment.amount}</b>, ${lastPayment.date}` : "";
-    return `📊 <b>${username}</b>\n\n${tierLine}${lastPaymentLine}`;
+    return `📊 <b>${escapeTelegramHtml(username)}</b>\n\n${tierLine}${lastPaymentLine}`;
   },
   accountBuyCta: "💳 Obuna sotib olish",
   accountRenewCta: "💳 Obunani uzaytirish",
@@ -151,7 +157,7 @@ export const texts = {
   paymentApprovedUser: (tier: PlanTier, endDate: string) =>
     `🎉 To'lovingiz tasdiqlandi!\n\nTarifingiz: <b>${TIER_LABEL[tier]}</b>\nAmal qilish muddati: <b>${endDate}</b> gacha.`,
   paymentRejectedUser: (reason?: string) =>
-    `❌ To'lovingiz rad etildi.${reason ? `\n\nSabab: ${reason}` : ""}\n\nSavolingiz bo'lsa, /help orqali murojaat qiling.`,
+    `❌ To'lovingiz rad etildi.${reason ? `\n\nSabab: ${escapeTelegramHtml(reason)}` : ""}\n\nSavolingiz bo'lsa, /help orqali murojaat qiling.`,
   // A "provisioned" payment already granted the tier on trust (OCR match) —
   // rejecting it takes that back, so this needs to say so explicitly rather
   // than the plain paymentRejectedUser message.
@@ -161,7 +167,7 @@ export const texts = {
   adminOcrLine: (ocr: { extractedAmount: number | null; transactionRef: string | null; amountMatched: boolean }) =>
     `\n\n🔎 OCR summa: <b>${ocr.extractedAmount !== null ? formatSom(ocr.extractedAmount) : "aniqlanmadi"}</b> ` +
     `(mos keldi: ${ocr.amountMatched ? "ha ✅" : "yo'q"})` +
-    (ocr.transactionRef ? `\nTranzaksiya: <code>${ocr.transactionRef}</code>` : ""),
+    (ocr.transactionRef ? `\nTranzaksiya: <code>${escapeTelegramHtml(ocr.transactionRef)}</code>` : ""),
   adminNewPaymentCaption: (input: {
     username: string;
     telegramUsername?: string;
@@ -172,7 +178,7 @@ export const texts = {
     ocr?: { extractedAmount: number | null; transactionRef: string | null; amountMatched: boolean } | null;
   }) =>
     `🆕 <b>Yangi to'lov (karta orqali)</b>\n\n` +
-    `Foydalanuvchi: <b>${input.username}</b>${input.telegramUsername ? ` (@${input.telegramUsername})` : ""}\n` +
+    `Foydalanuvchi: <b>${escapeTelegramHtml(input.username)}</b>${input.telegramUsername ? ` (@${escapeTelegramHtml(input.telegramUsername)})` : ""}\n` +
     `Tarif: <b>${TIER_LABEL[input.tier]}</b> — ${DURATION_LABEL[input.duration]}\n` +
     `Summa: <b>${input.amount}</b>\n` +
     `To'lov ID: <code>${input.paymentId}</code>` +
@@ -188,16 +194,16 @@ export const texts = {
     fullName: string;
   }) =>
     `🆕 <b>Yangi to'lov (chek yo'q — karta ma'lumoti)</b>\n\n` +
-    `Foydalanuvchi: <b>${input.username}</b>${input.telegramUsername ? ` (@${input.telegramUsername})` : ""}\n` +
+    `Foydalanuvchi: <b>${escapeTelegramHtml(input.username)}</b>${input.telegramUsername ? ` (@${escapeTelegramHtml(input.telegramUsername)})` : ""}\n` +
     `Tarif: <b>${TIER_LABEL[input.tier]}</b> — ${DURATION_LABEL[input.duration]}\n` +
     `Summa: <b>${input.amount}</b>\n` +
     `Yuboruvchi karta: <code>${input.cardNumber}</code>\n` +
-    `F.I.Sh: <b>${input.fullName}</b>\n` +
+    `F.I.Sh: <b>${escapeTelegramHtml(input.fullName)}</b>\n` +
     `To'lov ID: <code>${input.paymentId}</code>`,
   adminApproveButton: "✅ Tasdiqlash",
   adminRejectButton: "❌ Rad etish",
-  adminApproved: (byWhom: string) => `✅ Tasdiqlandi (${byWhom})`,
-  adminRejected: (byWhom: string) => `❌ Rad etildi (${byWhom})`,
+  adminApproved: (byWhom: string) => `✅ Tasdiqlandi (${escapeTelegramHtml(byWhom)})`,
+  adminRejected: (byWhom: string) => `❌ Rad etildi (${escapeTelegramHtml(byWhom)})`,
   adminAlreadyReviewed: "ℹ️ Bu to'lov allaqachon ko'rib chiqilgan (avtomatik bekor qilingan yoki boshqa admin tomonidan).",
   adminPendingList: (count: number) => `🛠 <b>Kutilayotgan to'lovlar:</b> ${count}`,
   adminPendingEmpty: "Kutilayotgan to'lovlar yo'q.",
@@ -220,7 +226,7 @@ export const texts = {
     const label = texts.paymentStatusLabel[p.status] ?? p.status;
     const detail =
       p.status === "rejected" && p.rejectedReason
-        ? `\n\nSabab: ${p.rejectedReason}`
+        ? `\n\nSabab: ${escapeTelegramHtml(p.rejectedReason)}`
         : p.status === "pending"
           ? "\n\nAdministrator hali ko'rib chiqmagan. Iltimos, biroz kuting."
           : p.status === "completed" || p.status === "approved"

@@ -44,15 +44,22 @@ The bot never talks to MongoDB directly — everything goes through
 
 ```
 BOT_INTERNAL_SECRET=<a long random string, 32+ chars>
+OTP_TELEGRAM_BOT_TOKEN=<BOT_TOKEN of this interactive hisvex-bot>
 ```
 
-Generate one, e.g. `openssl rand -hex 32`. Use the **exact same value** for
+Generate `BOT_INTERNAL_SECRET`, e.g. `openssl rand -hex 32`. Use the **exact same value** for
 `BOT_INTERNAL_SECRET` in this repo's `.env`. This is the shared secret the
 bot presents (as an `X-Bot-Secret` header) to call `/api/bot/*` — those
 routes refuse every request if this isn't set on the backend (fails
 closed), so the bot integration is off by default until you set it there.
 
 Redeploy/restart the backend after setting it.
+
+Set `OTP_TELEGRAM_BOT_TOKEN` on both the Railway API and Render standby API to
+this bot's `BOT_TOKEN`. Login OTPs are sent directly by the backend, whose
+existing `BOT_TOKEN` may belong to a separate reporting bot. Starting this
+interactive bot does not start a chat with that other reporting bot. Keeping
+the OTP token separate preserves the existing report and ops-alert sender.
 
 ## 3. Configure this bot
 

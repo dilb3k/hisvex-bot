@@ -15,6 +15,16 @@ test('bot accepts only the sender’s own Telegram contact in a private conversa
  await h.handlers.handleContact(ctx({phone_number:'998900000000',user_id:123}));assert.equal(h.calls[1][0],'link');assert.equal(h.calls[1][2],'123');assert.equal(h.calls[1][4],'998900000000')
  assert.equal(h.handlers.linkByPhone,undefined)
 })
+test('user-controlled account and payment text cannot inject Telegram HTML',()=>{
+ const {texts}=load('src/bot/texts.ts',{'../config/env':{env:{}}})
+ const unsafe='<a href="https://attacker.test">fake</a>&'
+ const linked=texts.linked(unsafe)
+ assert.ok(linked.includes('&lt;a href='));assert.equal(linked.includes('<a href='),false)
+ const caption=texts.adminCardDetailsCaption({username:unsafe,telegramUsername:'safe',tier:'bor',duration:1,amount:'100',paymentId:'fixture',cardNumber:'86001234',fullName:unsafe})
+ assert.equal(caption.includes('<a href='),false)
+ assert.ok(caption.includes('&lt;/a&gt;&amp;'))
+ assert.equal(texts.paymentRejectedUser(unsafe).includes('<a href='),false)
+})
 function apiHarness(){
  const axios=require('axios'),requests=[],handlers={}
  const http={interceptors:{request:{use:fn=>handlers.request=fn},response:{use:(ok,fail)=>handlers.fail=fail}},get:async()=>{},post:async()=>{}}
