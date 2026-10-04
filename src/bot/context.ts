@@ -12,6 +12,17 @@ export interface SessionData {
   // sending a receipt photo, so the next text message they send is
   // understood as "<card number>, <full name>" for this payment.
   awaitingCardInfoFor?: string | null;
+  // Ephemeral only: store a keyed digest, never a plaintext password.
+  passwordReset?: {
+    senderId: string;
+    stage: "new" | "confirm" | "busy";
+    expiresAt: number;
+    token?: string;
+    promptMessageId?: number;
+    lastEntryMessageId?: number;
+    digestKey?: string;
+    passwordDigest?: string;
+  };
 }
 
 export interface BotContext extends Context {

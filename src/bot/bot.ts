@@ -19,15 +19,17 @@ import {
 } from "./handlers/receipt";
 import { handleMenuAdmin, handleAdminApprove, handleAdminReject } from "./handlers/admin";
 import { handleMenuPayments, handleCheckPaymentStatus } from "./handlers/payments";
-import { handlePasswordReset } from "./handlers/password-reset";
+import { handlePasswordReset, handleCancelPasswordReset, passwordResetMiddleware } from "./handlers/password-reset";
 
 export function createBot(): Telegraf<BotContext> {
   const bot = new Telegraf<BotContext>(env.BOT_TOKEN);
 
   bot.use(session({ defaultSession: emptySession }));
+  bot.use(passwordResetMiddleware);
 
   bot.start(handleStart);
   bot.command("reset_password", handlePasswordReset);
+  bot.command("cancel", handleCancelPasswordReset);
   bot.help((ctx) => ctx.reply(texts.help, { parse_mode: "HTML" }));
 
   bot.on(message("contact"), handleContact);
@@ -125,8 +127,9 @@ export function createBot(): Telegraf<BotContext> {
   bot.action(/^admin_approve_(.+)$/, (ctx) => handleAdminApprove(ctx, ctx.match[1]));
   bot.action(/^admin_reject_(.+)$/, (ctx) => handleAdminReject(ctx, ctx.match[1]));
 
-  bot.catch((err, ctx) => {
-    console.error(`Unhandled bot error for update ${ctx.updateType}`, err);
+  bot.catch((_err, ctx) => {
+    // Telegram/HTTP error objects can contain incoming or outgoing secrets.
+    console.error(`Unhandled bot error for update ${ctx.updateType}`);
     ctx.reply(texts.genericError).catch(() => undefined);
   });
 
