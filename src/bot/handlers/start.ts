@@ -8,6 +8,21 @@ import { env } from "../../config/env";
 import { showMainMenu, isAdmin, resolveLinkedUser } from "./menu";
 
 export async function handleStart(ctx: BotContext) {
+  if (ctx.chat?.type !== "private" || !ctx.from) return;
+  ctx.session.awaitingCardInfoFor = undefined;
+  const payload = (ctx.message as { text?: string } | undefined)?.text?.trim().split(/\s+/)[1];
+  if (payload?.startsWith("reg_")) {
+    try {
+      const result = await api.startRegistration(payload.slice(4), String(ctx.from.id));
+      await ctx.reply(result.verified
+        ? "✅ Telefon tasdiqlangan. Formaga qaytib ro‘yxatdan o‘tishni yakunlang."
+        : "Ro‘yxatdan o‘tish uchun quyidagi «Telefon raqamni yuborish» tugmasini bosing. Raqamingiz formaga avtomatik tushadi.",
+        result.verified ? Markup.removeKeyboard() : keyboards.requestPhone);
+    } catch (err) {
+      await ctx.reply(err instanceof Error ? err.message : texts.genericError);
+    }
+    return;
+  }
   // Already linked — go straight to the menu instead of asking for the phone
   // number again every time. resolveLinkedUser() also covers a linked user
   // whose in-memory session was wiped by a bot restart (see its comment in
@@ -31,10 +46,20 @@ export async function handleContact(ctx: BotContext) {
   // of sharing their own — only trust it if Telegram says it's the sender's
   // own contact (contact.user_id matches the sender).
   if (ctx.chat?.type !== "private" || !contact.user_id || contact.user_id !== ctx.from?.id) {
-    await ctx.reply(texts.genericError, Markup.removeKeyboard());
+    await ctx.reply("O‘zingizning telefon raqamingizni quyidagi tugma orqali yuboring.", keyboards.requestPhone);
     return;
   }
 
+  try {
+    const result = await api.confirmRegistration(String(ctx.from!.id), String(contact.user_id), contact.phone_number, ctx.from?.username);
+    if (result.verified) {
+      await ctx.reply("✅ Telefon raqamingiz tasdiqlandi! Formaga qayting — raqamingiz avtomatik kiritildi. Ro‘yxatdan o‘tishni yakunlang.", Markup.removeKeyboard());
+      return;
+    }
+  } catch (err) {
+    await ctx.reply(err instanceof Error ? err.message : texts.genericError, keyboards.requestPhone);
+    return;
+  }
   await linkByPhone(ctx, contact.phone_number);
 }
 

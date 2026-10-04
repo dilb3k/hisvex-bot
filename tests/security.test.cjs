@@ -4,7 +4,7 @@ function load(file,mocks,extra={}) {
  vm.runInNewContext(code,{exports,require:n=>mocks[n]??require(n),URL,Headers,Response,FormData,Blob,Buffer,Uint8Array,AbortController,setTimeout,clearTimeout,setInterval:()=>({}),clearInterval(){},console,...extra});return exports
 }
 function startHarness(){
- const calls=[],api={lookupUserByPhone:async phone=>{calls.push(['lookup',phone]);return {userId:'owner',username:'store'}},linkTelegram:async(...args)=>calls.push(['link',...args])}
+ const calls=[],api={confirmRegistration:async()=>({verified:false}),lookupUserByPhone:async phone=>{calls.push(['lookup',phone]);return {userId:'owner',username:'store'}},linkTelegram:async(...args)=>calls.push(['link',...args])}
  const mocks={'../../services/api-client':{api},'../../config/env':{env:{APP_DOWNLOAD_URL:'https://example.test'}},'./menu':{resolveLinkedUser:async()=>null,showMainMenu:async()=>{},isAdmin:()=>false},'../texts':{texts:{genericError:'invalid contact',linked:()=> 'linked'}},'../keyboards':{keyboards:{persistentMenu:()=>({})}}}
  return {handlers:load('src/bot/handlers/start.ts',mocks),calls}
 }
@@ -25,6 +25,18 @@ test('user-controlled account and payment text cannot inject Telegram HTML',()=>
  assert.ok(caption.includes('&lt;/a&gt;&amp;'))
  assert.equal(texts.paymentRejectedUser(unsafe).includes('<a href='),false)
 })
+test('registration Start takes priority over a linked-account menu and own contact confirms without account lookup', async () => {
+ const calls=[], replies=[];
+ const api={startRegistration:async(...args)=>{calls.push(['start',...args]);return {verified:false}},confirmRegistration:async(...args)=>{calls.push(['confirm',...args]);return {verified:true}},lookupUserByPhone:async()=>{throw Error('registration has no account yet')}};
+ const handlers=load('src/bot/handlers/start.ts',{'../../services/api-client':{api},'../../config/env':{env:{}},'./menu':{resolveLinkedUser:async()=>{throw Error('must handle registration first')},showMainMenu:async()=>{},isAdmin:()=>false},'../texts':{texts:{genericError:'error'}},'../keyboards':{keyboards:{requestPhone:{reply_markup:{keyboard:[]}}}}});
+ const ctx={from:{id:123,username:'test'},chat:{type:'private'},message:{text:'/start reg_'+'A'.repeat(43)},session:{userId:'already-linked',awaitingCardInfoFor:'old-payment'},reply:async text=>replies.push(text)};
+ await handlers.handleStart(ctx);
+ assert.equal(calls[0][1],'A'.repeat(43));assert.equal(calls[0][2],'123');assert.equal(ctx.session.awaitingCardInfoFor,undefined);
+ // A new session imitates a restart between Start and contact delivery.
+ await handlers.handleContact({...ctx,session:{},message:{contact:{phone_number:'998901234567',user_id:123}}});
+ assert.equal(calls[1][0],'confirm');assert.equal(calls[1][1],'123');assert.equal(calls[1][2],'123');
+ assert.match(replies[1],/tasdiqlandi/);
+});
 function apiHarness(){
  const axios=require('axios'),requests=[],handlers={}
  const http={interceptors:{request:{use:fn=>handlers.request=fn},response:{use:(ok,fail)=>handlers.fail=fail}},get:async()=>{},post:async()=>{}}

@@ -257,6 +257,10 @@ export type ExpiringSoon = {
 };
 
 export const api = {
+  startRegistration: (startToken: string, telegramId: string) =>
+    unwrap<{ verified: boolean }>(http.post("/registration/start", { startToken, telegramId })),
+  confirmRegistration: (telegramId: string, contactUserId: string, phone: string, telegramUsername?: string) =>
+    unwrap<{ verified: boolean }>(http.post("/registration/confirm", { telegramId, contactUserId, phone, telegramUsername })),
   getPricing(): Promise<PricingResponse> {
     return unwrap(http.get("/pricing"));
   },

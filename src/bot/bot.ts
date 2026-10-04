@@ -71,12 +71,12 @@ export function createBot(): Telegraf<BotContext> {
     return next();
   });
 
-  // Also accept a phone number typed as plain text (some users decline the
-  // "share contact" button but will type the number instead).
+  // Typing a phone number cannot prove ownership, including during signup
+  // from a Telegram account that was already linked before this Start.
   bot.on(message("text"), async (ctx, next) => {
     const text = ctx.message.text.trim();
     const digits = text.replace(/\D/g, "");
-    if (!ctx.session.userId && digits.length >= 9 && digits.length <= 13) {
+    if (digits.length >= 9 && digits.length <= 13) {
       await ctx.reply("Telefon raqamini yozish egalikni tasdiqlamaydi. O‘zingizning kontaktingizni tugma orqali yuboring.", (await import("./keyboards")).keyboards.requestPhone);
       return;
     }
