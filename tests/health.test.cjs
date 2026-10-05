@@ -114,25 +114,27 @@ async function startHarness(t, options = {}) {
   return { request, webhookPath, registrations, updates, externalCalls: () => externalCalls };
 }
 
-test('GET /health is public, minimal, uncached and independent of external services', { timeout: 10000 }, async (t) => {
+test('/health accepts every method, including bodyless HEAD, without external services', { timeout: 10000 }, async (t) => {
   const h = await startHarness(t);
   for (const url of ['/health', '/health?monitor=uptimerobot']) {
-    const res = await h.request('GET', url);
-    assert.equal(res.status, 200);
-    assert.equal(res.headers['content-type'], 'application/json; charset=utf-8');
-    assert.equal(res.headers['cache-control'], 'no-store');
-    assert.deepEqual(JSON.parse(res.body), { status: 'ok', service: 'hisvex-bot' });
+    for (const method of ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']) {
+      const res = await h.request(method, url);
+      assert.equal(res.status, 200, `${method} ${url}`);
+      assert.equal(res.headers['content-type'], 'application/json; charset=utf-8');
+      assert.equal(res.headers['cache-control'], 'no-store');
+      if (method === 'HEAD') assert.equal(res.body, '');
+      else assert.deepEqual(JSON.parse(res.body), { status: 'ok', service: 'hisvex-bot' });
+    }
   }
   assert.equal(h.updates.length, 0, 'health must not invoke bot middleware');
   assert.equal(h.externalCalls(), 0, 'health must not call an external service');
 });
 
-test('health only exposes the exact GET route; other requests retain HTTP 403', { timeout: 10000 }, async (t) => {
+test('health only exposes the exact path; other requests retain HTTP 403', { timeout: 10000 }, async (t) => {
   const h = await startHarness(t);
   for (const [method, url] of [
     ['GET', '/'], ['GET', '/unknown'], ['GET', '/health/'],
     ['GET', '/health/extra'], ['GET', '/%68ealth'], ['GET', '/HEALTH'],
-    ['POST', '/health'], ['PUT', '/health'], ['HEAD', '/health'], ['OPTIONS', '/health'],
     ['GET', h.webhookPath], ['POST', '/tg/wrong-path'],
     ['POST', `${h.webhookPath}?monitor=uptimerobot`],
   ]) {
