@@ -245,6 +245,7 @@ export type Payment = {
   rejectedReason?: string | null;
   merchantTransId?: string;
   createdAt: string;
+  needsReconciliation?: boolean;
 };
 
 export type ExpiringSoon = {
@@ -256,6 +257,9 @@ export type ExpiringSoon = {
   subscriptionEndDate: string;
 };
 
+let pricingCache: { value: PricingResponse; expires: number } | null = null;
+let pricingRequest: Promise<PricingResponse> | null = null;
+
 export const api = {
   requestPasswordReset: (telegramId: string) =>
     unwrap<{ token: string; expiresAt: string }>(http.post("/password-reset/chat", { telegramId })),
@@ -266,7 +270,11 @@ export const api = {
   confirmRegistration: (telegramId: string, contactUserId: string, phone: string, telegramUsername?: string) =>
     unwrap<{ verified: boolean }>(http.post("/registration/confirm", { telegramId, contactUserId, phone, telegramUsername })),
   getPricing(): Promise<PricingResponse> {
-    return unwrap(http.get("/pricing"));
+    if (pricingCache && pricingCache.expires > Date.now()) return Promise.resolve(pricingCache.value);
+    if (!pricingRequest) pricingRequest = unwrap<PricingResponse>(http.get("/pricing"))
+      .then(value => { pricingCache = { value, expires: Date.now() + 60_000 }; return value; })
+      .finally(() => { pricingRequest = null; });
+    return pricingRequest;
   },
 
   lookupUserByPhone(phone: string): Promise<UserLookup | null> {
@@ -331,6 +339,10 @@ export const api = {
     reason?: string
   ): Promise<{ payment: Payment; wasDowngraded: boolean }> {
     return unwrap(http.post(`/payments/${paymentId}/reject`, { rejectedByTelegramId, reason }));
+  },
+
+  getReviewQueue(page = 1): Promise<{items: Payment[]; total: number; page: number; totalPages: number}> {
+    return unwrap(http.get("/payments/review-queue", { params: { page, limit: 5 } }));
   },
 
   getPendingPayments(): Promise<Payment[]> {

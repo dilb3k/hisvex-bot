@@ -17,7 +17,7 @@ import {
   looksLikeCardDetails,
   recoverCardDetailsPaymentId,
 } from "./handlers/receipt";
-import { handleMenuAdmin, handleAdminApprove, handleAdminReject } from "./handlers/admin";
+import { handleMenuAdmin, handleAdminApprove, handleAdminReject, handleAdminView } from "./handlers/admin";
 import { handleMenuPayments, handleCheckPaymentStatus } from "./handlers/payments";
 import { handlePasswordReset, handleCancelPasswordReset, passwordResetMiddleware } from "./handlers/password-reset";
 
@@ -93,7 +93,10 @@ export function createBot(): Telegraf<BotContext> {
   bot.action("menu_account", handleMenuAccount);
   bot.action("menu_payments", handleMenuPayments);
   bot.action("menu_help", handleMenuHelp);
-  bot.action("menu_admin", handleMenuAdmin);
+  bot.action("menu_admin", ctx => handleMenuAdmin(ctx));
+  bot.command("admin", ctx => handleMenuAdmin(ctx));
+  bot.action(/^admin_page_([1-9]\d{0,5})$/, ctx => handleMenuAdmin(ctx, Number(ctx.match[1])));
+  bot.action(/^admin_view_([a-f\d]{24})$/i, ctx => handleAdminView(ctx, ctx.match[1]));
   bot.action("menu_buy", handleMenuBuy);
   bot.action("menu_reset_password", handlePasswordReset);
 
@@ -104,7 +107,7 @@ export function createBot(): Telegraf<BotContext> {
   bot.hears(texts.menuButtons.myAccount, handleMenuAccount);
   bot.hears(texts.menuButtons.myPayments, handleMenuPayments);
   bot.hears(texts.menuButtons.help, handleMenuHelp);
-  bot.hears(texts.menuButtons.admin, handleMenuAdmin);
+  bot.hears(texts.menuButtons.admin, ctx => handleMenuAdmin(ctx));
   bot.hears(texts.menuButtons.resetPassword, handlePasswordReset);
 
   bot.action(/^plan_tier_(bor|pro)$/, (ctx) => handleChooseTier(ctx, ctx.match[1] as PlanTier));

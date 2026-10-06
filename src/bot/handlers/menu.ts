@@ -58,16 +58,16 @@ export async function handleMenuAccount(ctx: BotContext) {
   if (!userId) return;
 
   try {
-    const status = await api.getSubscriptionStatus(userId);
+    const [status, paymentResult] = await Promise.all([api.getSubscriptionStatus(userId), api.getPaymentsByUser(userId).catch(() => null)]);
     const left = daysLeft(status.subscriptionEndDate);
 
     // Nice-to-have, not essential to the screen — a failure here shouldn't
     // block showing the rest of the account view.
     let lastPayment: { amount: string; date: string } | null = null;
     try {
-      const payments = await api.getPaymentsByUser(userId);
+      const payments = paymentResult ?? [];
       const latestSettled = payments
-        .filter((p) => p.status === "completed" || p.status === "provisioned")
+        .filter((p) => p.status === "completed" || p.status === "approved")
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
       if (latestSettled) {
         lastPayment = { amount: formatSom(latestSettled.amount), date: formatDate(latestSettled.createdAt) };

@@ -1,9 +1,11 @@
 import type { BotContext } from "../context";
-import { texts, formatDate, formatSom } from "../texts";
+import { texts, formatDate, formatSom, escapeTelegramHtml } from "../texts";
 import { keyboards } from "../keyboards";
-import { api, ApiError } from "../../services/api-client";
+import { api, ApiError, type Payment } from "../../services/api-client";
 import { isAdmin } from "./menu";
 import { respond, ackIfCallback } from "../respond";
+
+const reviewing = new Set<string>();
 
 function displayName(ctx: BotContext): string {
   const u = ctx.from;
@@ -17,9 +19,11 @@ export async function handleAdminApprove(ctx: BotContext, paymentId: string) {
     return;
   }
 
+  if (reviewing.has(paymentId)) { await ctx.answerCbQuery("Amal bajarilmoqda. Biroz kuting."); return; }
+  reviewing.add(paymentId);
   try {
+    await ackIfCallback(ctx);
     const payment = await api.approvePayment(paymentId, String(ctx.from!.id));
-    await ctx.answerCbQuery("✅");
 
     const who = displayName(ctx);
     await editApprovalCard(ctx, texts.adminApproved(who));
@@ -39,16 +43,16 @@ export async function handleAdminApprove(ctx: BotContext, paymentId: string) {
       console.error(`Failed to notify user ${payment.telegramUserId} of payment approval`, notifyErr);
     }
   } catch (err) {
-    if (err instanceof ApiError && err.statusCode === 400) {
+    if (err instanceof ApiError && (err.statusCode === 400 || err.statusCode === 409)) {
       // The 48h auto-expire cron (or another admin, in a race) already
       // moved this payment out of "pending"/"provisioned" — nothing left to
       // approve, and it's not this admin's fault, so no "xatolik" alert.
-      await ctx.answerCbQuery(texts.adminAlreadyReviewed, { show_alert: true });
+      await ctx.reply(texts.adminAlreadyReviewed);
       return;
     }
     console.error("handleAdminApprove failed", err);
-    await ctx.answerCbQuery(texts.genericError, { show_alert: true });
-  }
+    await ctx.reply(texts.genericError);
+  } finally { reviewing.delete(paymentId); }
 }
 
 export async function handleAdminReject(ctx: BotContext, paymentId: string) {
@@ -57,9 +61,11 @@ export async function handleAdminReject(ctx: BotContext, paymentId: string) {
     return;
   }
 
+  if (reviewing.has(paymentId)) { await ctx.answerCbQuery("Amal bajarilmoqda. Biroz kuting."); return; }
+  reviewing.add(paymentId);
   try {
+    await ackIfCallback(ctx);
     const { payment, wasDowngraded } = await api.rejectPayment(paymentId, String(ctx.from!.id));
-    await ctx.answerCbQuery("❌");
 
     const who = displayName(ctx);
     await editApprovalCard(ctx, texts.adminRejected(who));
@@ -76,65 +82,73 @@ export async function handleAdminReject(ctx: BotContext, paymentId: string) {
       console.error(`Failed to notify user ${payment.telegramUserId} of payment rejection`, notifyErr);
     }
   } catch (err) {
-    if (err instanceof ApiError && err.statusCode === 400) {
-      await ctx.answerCbQuery(texts.adminAlreadyReviewed, { show_alert: true });
+    if (err instanceof ApiError && (err.statusCode === 400 || err.statusCode === 409)) {
+      await ctx.reply(texts.adminAlreadyReviewed);
       return;
     }
     console.error("handleAdminReject failed", err);
-    await ctx.answerCbQuery(texts.genericError, { show_alert: true });
-  }
+    await ctx.reply(texts.genericError);
+  } finally { reviewing.delete(paymentId); }
 }
 
-// The approval card is a photo message (the receipt) with a caption —
-// editMessageCaption (not editMessageText) is the right API for that, and
-// we drop the inline keyboard so a second admin can't double-tap it.
 async function editApprovalCard(ctx: BotContext, statusLine: string) {
-  const original = (ctx.callbackQuery as any)?.message?.caption as string | undefined;
-  const newCaption = original ? `${original}\n\n${statusLine}` : statusLine;
+  const message = (ctx.callbackQuery as any)?.message;
+  const original = message?.caption ?? message?.text;
+  const text = original ? `${escapeTelegramHtml(original)}\n\n${statusLine}` : statusLine;
+  const options = { parse_mode: "HTML" as const, reply_markup: { inline_keyboard: [[{ text: "📋 To‘lovlar navbati", callback_data: "menu_admin" }]] } };
   try {
-    await ctx.editMessageCaption(newCaption, { parse_mode: "HTML" });
-  } catch {
-    // If the original message had no caption (shouldn't happen for our own
-    // photo+caption sends, but don't let a formatting edge case crash the
-    // handler) fall back to a plain reply so the decision is still visible.
-    await ctx.reply(statusLine);
-  }
+    if (message?.photo) await ctx.editMessageCaption(text, options);
+    else await ctx.editMessageText(text, options);
+  } catch { await ctx.reply(statusLine, options); }
 }
 
-export async function handleMenuAdmin(ctx: BotContext) {
+export async function handleMenuAdmin(ctx: BotContext, page = 1) {
   await ackIfCallback(ctx);
   if (!isAdmin(ctx.from?.id)) {
     await respond(ctx, texts.notAdmin, keyboards.backToMenu);
     return;
   }
-
   try {
-    const pending = await api.getPendingPayments();
-    // Only manual_card payments wait on an admin's tap here — "pending"
-    // click payments (if any show up mid-webhook) resolve themselves and
-    // were never actionable from this list. Filter before counting, not
-    // after: counting the unfiltered total against a filtered list of rows
-    // showed a header like "3 ta kutilmoqda" above only 1 visible row,
-    // which read as the other 2 having silently vanished.
-    const manualPending = pending.filter((p) => p.method === "manual_card");
-    if (manualPending.length === 0) {
-      await respond(ctx, `${texts.adminPendingList(0)}\n\n${texts.adminPendingEmpty}`, {
-        parse_mode: "HTML",
-        ...keyboards.backToMenu,
-      });
-      return;
-    }
-
-    const lines = manualPending
-      .map((p) => `• <b>${p.telegramUsername ?? p.telegramUserId}</b> — ${p.tier} / ${p.durationMonths} oy — ${formatSom(p.amount)} — <code>${p.id}</code>`)
-      .join("\n");
-
-    await respond(ctx, `${texts.adminPendingList(manualPending.length)}\n\n${lines}`, {
-      parse_mode: "HTML",
-      ...keyboards.backToMenu,
+    let queue = await api.getReviewQueue(page);
+    if (page > Math.max(1, queue.totalPages)) queue = await api.getReviewQueue(Math.max(1, queue.totalPages));
+    const lines = queue.items.map((p, i) => {
+      const name = escapeTelegramHtml((p.telegramUsername || p.telegramUserId).slice(0, 80));
+      const state = p.needsReconciliation || p.status === "provisioned" ? "⚠️ Tekshirish kerak" : "⏳ Kutilmoqda";
+      return `${(queue.page - 1) * 5 + i + 1}. <b>${name}</b>\n${p.tier.toUpperCase()} · ${p.durationMonths} oy · <b>${formatSom(p.amount)}</b>\n${formatDate(p.createdAt)} · ${state}`;
     });
-  } catch (err) {
-    console.error("handleMenuAdmin failed", err);
-    await ctx.reply(texts.genericError);
-  }
+    const inline_keyboard = queue.items.map((p, i) => [{ text: `${(queue.page - 1) * 5 + i + 1}. To‘lovni ochish`, callback_data: `admin_view_${p.id}` }]);
+    const nav = [];
+    if (queue.page > 1) nav.push({ text: "← Oldingi", callback_data: `admin_page_${queue.page - 1}` });
+    if (queue.page < queue.totalPages) nav.push({ text: "Keyingi →", callback_data: `admin_page_${queue.page + 1}` });
+    if (nav.length) inline_keyboard.push(nav);
+    inline_keyboard.push([{ text: "🔄 Yangilash", callback_data: `admin_page_${queue.page}` }, { text: "🏠 Menyu", callback_data: "menu_main" }]);
+    await respond(ctx, `${texts.adminPendingList(queue.total)}\n${queue.total ? `Sahifa ${queue.page} / ${queue.totalPages}\n\n${lines.join("\n\n")}` : `\n${texts.adminPendingEmpty}`}`, { parse_mode: "HTML", reply_markup: { inline_keyboard } });
+  } catch { await ctx.reply(texts.genericError); }
+}
+
+export function adminPaymentDetail(payment: Payment) {
+  const safe = (value: string | undefined | null, limit = 120) => escapeTelegramHtml((value || "—").slice(0, limit));
+  const sender = payment.senderCardDetails;
+  const state = payment.needsReconciliation ? "⚠️ Qo‘shimcha tekshirish kerak" : texts.paymentStatusLabel[payment.status] ?? payment.status;
+  return `💳 <b>To‘lov tafsilotlari</b>\n\nHisob: <b>${safe(payment.telegramUsername || payment.telegramUserId, 60)}</b>\nTarif: ${payment.tier.toUpperCase()} · ${payment.durationMonths} oy\nSumma: <b>${formatSom(payment.amount)}</b>\nSana: ${formatDate(payment.createdAt)}\nHolat: ${state}\nID: <code>${safe(payment.id, 24)}</code>` +
+    (sender ? `\nYuboruvchi: ${safe(sender.fullName, 60)}\nKarta: •••• ${safe(sender.cardNumber.replace(/\D/g, "").slice(-4))}` : "") +
+    (payment.ocr?.extractedAmount != null ? `\nChekdagi summa: ${formatSom(payment.ocr.extractedAmount)}` : "") +
+    (payment.rejectedReason ? `\nSabab: ${safe(payment.rejectedReason, 100)}` : "") +
+    (payment.status === "provisioned" ? "\n⚠️ Eski avtomatik faollashtirish. Obunani alohida tekshiring." : "");
+}
+
+export async function handleAdminView(ctx: BotContext, paymentId: string) {
+  await ackIfCallback(ctx);
+  if (!isAdmin(ctx.from?.id)) { await ctx.reply(texts.notAdmin); return; }
+  try {
+    const payment = await api.getPayment(paymentId);
+    if (payment.method !== "manual_card") { await ctx.reply("Bu to‘lov Click orqali boshqariladi."); return; }
+    const actions = payment.status === "pending" ? keyboards.adminPaymentActions(paymentId).reply_markup.inline_keyboard : [];
+    const options = { parse_mode: "HTML" as const, reply_markup: { inline_keyboard: [...actions, [{ text: "📋 To‘lovlar navbati", callback_data: "menu_admin" }]] } };
+    if (payment.receiptFileId) {
+      try { await ctx.replyWithPhoto(payment.receiptFileId, { caption: adminPaymentDetail(payment), ...options }); return; }
+      catch { /* Receipt metadata remains reviewable if Telegram cannot load its photo. */ }
+    }
+    await respond(ctx, adminPaymentDetail(payment), options);
+  } catch { await ctx.reply(texts.genericError); }
 }

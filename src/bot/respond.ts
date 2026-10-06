@@ -16,7 +16,9 @@ export async function respond(
   if (ctx.callbackQuery) {
     try {
       return await ctx.editMessageText(text, extra);
-    } catch {
+    } catch (error) {
+      // A refresh with identical content already has the correct screen.
+      if ((error as {description?: string})?.description?.includes("message is not modified")) return;
       // Editing can fail (e.g. message too old, or content unchanged) —
       // fall back to a fresh reply so the user still gets an answer.
       return ctx.reply(text, extra);
