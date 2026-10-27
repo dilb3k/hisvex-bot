@@ -234,7 +234,9 @@ export type Payment = {
   tier: PlanTier;
   durationMonths: PlanDuration;
   amount: number;
-  method: "click" | "manual_card";
+  method: "click" | "manual_card" | "tezcheck";
+  tezcheckBillId?: string;
+  tezcheckPayUrl?: string;
   // "provisioned" = OCR matched the amount and the tier was already granted
   // on trust, pending a human's later sign-off (see attachReceipt below).
   status: "pending" | "provisioned" | "approved" | "rejected" | "completed" | "cancelled";
@@ -261,6 +263,10 @@ let pricingCache: { value: PricingResponse; expires: number } | null = null;
 let pricingRequest: Promise<PricingResponse> | null = null;
 
 export const api = {
+  getTezcheckPayment: (id:string) => unwrap<Payment>(http.get(`/payments/${id}`,{timeout:3000})),
+  createTezcheckPending: (input: {userId:string;telegramUserId:string;telegramUsername?:string;tier:PlanTier;durationMonths:PlanDuration;requestKey:string}) => unwrap<Payment>(http.post('/payments/tezcheck',input,{timeout:5000})),
+  bindTezcheckBill: (id:string,input:{telegramUserId:string;billId:string;payUrl:string}) => unwrap<Payment>(http.post(`/payments/tezcheck/${id}/bill`,input,{timeout:5000})),
+  settleTezcheck: (id:string,input:unknown) => unwrap<Payment>(http.post(`/payments/tezcheck/${id}/settle`,input,{timeout:4000})),
   requestPasswordReset: (telegramId: string) =>
     unwrap<{ token: string; expiresAt: string }>(http.post("/password-reset/chat", { telegramId })),
   confirmPasswordReset: (telegramId: string, token: string, password: string) =>

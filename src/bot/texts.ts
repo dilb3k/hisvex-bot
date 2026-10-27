@@ -236,13 +236,13 @@ export const texts = {
     cancelled: "⚪️ Bekor qilingan",
   } as Record<string, string>,
   checkStatusButton: "🔄 Holatni tekshirish",
-  checkStatusResult: (p: { status: string; rejectedReason?: string | null }) => {
+  checkStatusResult: (p: { status: string; rejectedReason?: string | null; method?:string; needsReconciliation?:boolean }) => {
     const label = texts.paymentStatusLabel[p.status] ?? p.status;
-    const detail =
+    const detail = p.needsReconciliation ? "\n\nTo‘lov qo‘shimcha tekshirilmoqda. Yordam xizmatiga murojaat qiling." :
       p.status === "rejected" && p.rejectedReason
         ? `\n\nSabab: ${escapeTelegramHtml(p.rejectedReason)}`
         : p.status === "pending"
-          ? "\n\nAdministrator hali ko'rib chiqmagan. Iltimos, biroz kuting."
+          ? (p.method === "tezcheck" ? "\n\nTo‘lov hali tasdiqlanmadi. To‘lovni yakunlab, holatni qayta tekshiring." : "\n\nAdministrator hali ko'rib chiqmagan. Iltimos, biroz kuting.")
           : p.status === "completed" || p.status === "approved"
             ? "\n\nTabriklaymiz, to'lovingiz tasdiqlangan!"
             : "";

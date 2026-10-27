@@ -67,7 +67,7 @@ async function startHarness(t, options = {}) {
     './config/env': { env },
     './bot/bot': { createBot: () => bot },
     './cron/reminders': { startReminderCron: () => {} },
-    './http/webhook-fallback': load('src/http/webhook-fallback.ts', {}),
+    './http/webhook-fallback': load('src/http/webhook-fallback.ts', {'../services/tezcheck':{verifyTezcheck:()=>false,processTezcheckEvent:async()=>{}}}, {Buffer,console}),
   }, {
     console: { log() {}, error() {} },
     process: {

@@ -48,13 +48,19 @@ export const keyboards = {
       [Markup.button.callback(texts.back, "menu_buy")],
     ]),
 
-  chooseMethod: (tier: PlanTier, duration: PlanDuration, clickEnabled: boolean) =>
+  chooseMethod: (tier: PlanTier, duration: PlanDuration, clickEnabled: boolean, tezcheckEnabled=false) =>
     Markup.inlineKeyboard([
-      ...(clickEnabled ? [[Markup.button.callback(texts.methodClick, `pay_click_${tier}_${duration}`)]] : []),
-      [Markup.button.callback(texts.methodManual, `pay_manual_${tier}_${duration}`)],
+      ...(tezcheckEnabled ? [[Markup.button.callback("💳 Onlayn to‘lash — TezCheck", `pay_tezcheck_${tier}_${duration}`)]] : []),
+      ...(!tezcheckEnabled && clickEnabled ? [[Markup.button.callback(texts.methodClick, `pay_click_${tier}_${duration}`)]] : []),
+      ...(!tezcheckEnabled ? [[Markup.button.callback(texts.methodManual, `pay_manual_${tier}_${duration}`)]] : []),
       [Markup.button.callback(texts.back, `plan_tier_${tier}`)],
     ]),
 
+  tezcheckPayLink: (url:string,id:string) => Markup.inlineKeyboard([
+    [Markup.button.url('💳 To‘lash',url)],
+    [Markup.button.callback(texts.checkStatusButton,`check_payment_${id}`)],
+    [Markup.button.callback(texts.back,'menu_main')],
+  ]),
   clickPayLink: (url: string) =>
     Markup.inlineKeyboard([
       [Markup.button.url(texts.clickPayButton, url)],

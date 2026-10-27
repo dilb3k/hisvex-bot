@@ -1,0 +1,31 @@
+const {test}=require('node:test'),assert=require('node:assert/strict'),crypto=require('node:crypto'),vm=require('node:vm'),fs=require('node:fs'),ts=require('typescript');
+const code=ts.transpileModule(fs.readFileSync('src/services/tezcheck.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+function load(api={},fetcher=fetch){const exports={};const env={TEZCHECK_API_KEY:'test-key',TEZCHECK_CASH_DESK_CODE:'test-desk',TEZCHECK_WEBHOOK_SECRET:'test-secret',TEZCHECK_CASH_DESK_ID:'67',TEZCHECK_ORGANIZATION_ID:'10',TEZCHECK_API_URL:process.env.TEZCHECK_SIMULATION_URL||'https://api.tezcheck.uz/api/merchant/v1'};vm.runInNewContext(code,{exports,require:n=>n==='../config/env'?{env}:n==='./api-client'?{api}:require(n),Buffer,URL,Date,AbortSignal,fetch:fetcher,console});return exports;}
+const payment={id:'abcdef123456abcdef123456',method:'tezcheck',tier:'pro',durationMonths:1,amount:100000,status:'pending',createdAt:new Date().toISOString(),tezcheckBillId:'link_test'};
+const good={bill:{id:'link_test',external_reference:payment.id,amount_minor:10000000,currency:'UZS',environment:'live',livemode:true,paid:true},payment:{id:'pay_test',amount_minor:10000000,net_minor:9900000,fee_minor:100000,refunded_amount_minor:0,currency:'UZS',environment:'live',livemode:true,state:'succeeded'}};
+test('raw-byte HMAC checks version, rotation, delivery, timestamp and tampering',()=>{
+ const t=load(),raw=Buffer.from('{ "unicode": "so‘m" }'),stamp=String(Math.floor(Date.now()/1000)),delivery='whd_test';const sig=crypto.createHmac('sha256','test-secret').update(`${stamp}.${delivery}.`).update(raw).digest('hex');const h={'x-checkout-timestamp':stamp,'x-checkout-delivery':delivery,'x-checkout-signature':`v1=${'0'.repeat(64)},v1=${sig}`};
+ assert.equal(t.verifyTezcheck(raw,h),true);assert.equal(t.verifyTezcheck(Buffer.from('{}'),h),false);assert.equal(t.verifyTezcheck(raw,{...h,'x-checkout-signature':`v2=${sig}`}),false);assert.equal(t.verifyTezcheck(raw,{...h,'x-checkout-delivery':'other'}),false);assert.equal(t.verifyTezcheck(raw,h,Date.now()+301000),false);
+});
+test('canonical live payment settles; test, unpaid, mismatched bills never grant',async()=>{
+ for(const variant of ['live','test','unpaid','wrong']){let calls=0;const d=structuredClone(good);if(variant==='test')d.payment.environment='test';if(variant==='unpaid')d.bill.paid=false;if(variant==='wrong')d.bill.external_reference='wrong';const t=load({settleTezcheck:async(id,p)=>{calls++;assert.equal(p.netMinor,9900000);return payment;}},async()=>({ok:true,json:async()=>({data:d})}));if(variant==='wrong')await assert.rejects(t.reconcileTezcheck(payment));else await t.reconcileTezcheck(payment);assert.equal(calls,variant==='live'?1:0);}
+});
+test('webhook trusts body id and environment; wrong merchant is rejected',async()=>{
+ let calls=0,seen;const t=load({getTezcheckPayment:async()=>payment,settleTezcheck:async(id,p)=>{calls++;seen=p.eventId;}},async()=>({ok:true,json:async()=>({data:good})}));const e={schema_version:1,id:'oev_stable',type:'payment.succeeded',mode:'test',organization_id:'10',cash_desk_id:'67',data:{cash_desk_public_id:'67',external_reference:payment.id,bill_id:'link_test',environment:'live'}};await t.processTezcheckEvent(e);assert.equal(calls,1);assert.equal(seen,'oev_stable');await t.processTezcheckEvent({...e,data:{...e.data,environment:'test'}});assert.equal(calls,1);await assert.rejects(t.processTezcheckEvent({...e,cash_desk_id:'68'}));
+});
+test('checkout uses server price and stable idempotency; retries keep same local payment',async()=>{
+ let bound,req;const p={...payment,tezcheckBillId:undefined};const t=load({createTezcheckPending:async()=>p,bindTezcheckBill:async(id,b)=>{bound=b;return {...p,tezcheckPayUrl:b.payUrl};}},async(url,r)=>{req=r;return {ok:true,json:async()=>({data:{bill:good.bill,payment_url:'https://tezcheck.uz/pay/plk_test'}})};});await t.createTezcheckCheckout({telegramUserId:'1'});assert.equal(JSON.parse(req.body).amount_minor,10000000);assert.equal(req.headers['Idempotency-Key'],'hisvex-'+payment.id);assert.equal(bound.billId,'link_test');
+});
+test('provider outage propagates and never settles',async()=>{let calls=0;const t=load({settleTezcheck:async()=>{calls++;}},async()=>({ok:false,status:503,json:async()=>{throw Error('HTML');}}));await assert.rejects(t.reconcileTezcheck(payment));assert.equal(calls,0);});
+test('real HTTP client against contract simulation signs and handles outages',{skip:!process.env.TEZCHECK_SIMULATION_URL},async()=>{
+ let calls=0;const t=load({settleTezcheck:async()=>{calls++;return payment;}});await t.reconcileTezcheck(payment);assert.equal(calls,1);await assert.rejects(t.reconcileTezcheck({...payment,tezcheckBillId:'link_failure'}));assert.equal(calls,1);
+});
+test('HTTP webhook verifies original bytes on dedicated and existing root URLs',async(t)=>{
+ const http=require('node:http');let processed=0;const service=load();
+ const exports={};const fallback=ts.transpileModule(fs.readFileSync('src/http/webhook-fallback.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+ vm.runInNewContext(fallback,{exports,Buffer,console,require:n=>n==='../services/tezcheck'?{verifyTezcheck:service.verifyTezcheck,processTezcheckEvent:async()=>{processed++;}}:require(n)});
+ const server=http.createServer(exports.webhookFallback);await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>{server.closeAllConnections();server.close();});const base='http://127.0.0.1:'+server.address().port;
+ const raw='{ "id": "oev_test", "text": "so‘m" }',stamp=String(Math.floor(Date.now()/1000)),delivery='whd_test',sig=crypto.createHmac('sha256','test-secret').update(`${stamp}.${delivery}.${raw}`).digest('hex');const headers={'x-checkout-timestamp':stamp,'x-checkout-delivery':delivery,'x-checkout-signature':'v1='+sig,'content-type':'application/json'};
+ for(const path of ['/','/webhooks/tezcheck'])assert.equal((await fetch(base+path,{method:'POST',headers,body:raw})).status,200);
+ assert.equal(processed,2);assert.equal((await fetch(base+'/webhooks/tezcheck',{method:'POST',headers,body:'{}'})).status,401);assert.equal(processed,2);assert.equal((await fetch(base+'/health')).status,200);
+});

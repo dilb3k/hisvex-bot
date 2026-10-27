@@ -4,6 +4,12 @@ import { z } from "zod";
 dotenv.config();
 
 const envSchema = z.object({
+  TEZCHECK_API_URL: z.string().url().default('https://api.tezcheck.uz/api/merchant/v1'),
+  TEZCHECK_API_KEY: z.string().optional(),
+  TEZCHECK_CASH_DESK_CODE: z.string().optional(),
+  TEZCHECK_WEBHOOK_SECRET: z.string().optional(),
+  TEZCHECK_CASH_DESK_ID: z.string().optional(),
+  TEZCHECK_ORGANIZATION_ID: z.string().optional(),
   BOT_TOKEN: z.string().trim().min(1, "BOT_TOKEN is required — get one from @BotFather"),
   ADMIN_TELEGRAM_IDS: z
     .string()

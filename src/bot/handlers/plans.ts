@@ -1,3 +1,4 @@
+import { createTezcheckCheckout, tezcheckEnabled } from '../../services/tezcheck';
 import type { BotContext } from "../context";
 import { texts, formatSom } from "../texts";
 import { keyboards } from "../keyboards";
@@ -48,7 +49,7 @@ export async function handleChooseDuration(ctx: BotContext, tier: PlanTier, dura
     const amount = pricing[tier][String(duration)];
     await respond(ctx, texts.chooseMethod(tier, duration, formatSom(amount)), {
       parse_mode: "HTML",
-      ...keyboards.chooseMethod(tier, duration, clickEnabled),
+      ...keyboards.chooseMethod(tier, duration, clickEnabled, tezcheckEnabled()),
     });
   } catch (err) {
     console.error("handleChooseDuration failed", err);
@@ -104,4 +105,15 @@ export async function handlePayClick(ctx: BotContext, tier: PlanTier, duration: 
     console.error("handlePayClick failed", err);
     await ctx.reply(texts.clickNotReady);
   }
+}
+
+export async function handlePayTezcheck(ctx:BotContext,tier:PlanTier,duration:PlanDuration){
+ await ctx.answerCbQuery();const userId=await requireLinked(ctx);if(!userId)return;
+ try{
+  const messageId=ctx.callbackQuery?.message?.message_id;
+  if(!messageId)throw new Error('Missing order message');
+  const {payment,payUrl}=await createTezcheckCheckout({userId,telegramUserId:String(ctx.from!.id),telegramUsername:ctx.from?.username,tier,durationMonths:duration,requestKey:`${ctx.chat!.id}:${messageId}:${tier}:${duration}`});
+  ctx.session.awaitingReceiptFor=undefined;ctx.session.awaitingCardInfoFor=undefined;
+  await respond(ctx,payUrl?`💳 Hisvex ${tier.toUpperCase()} — ${duration} oy\nSumma: ${formatSom(payment.amount)}\n\nTo‘lov tugagach obunangiz avtomatik faollashadi. Holatni quyidagi tugma bilan tekshirishingiz mumkin.`:'✅ Ushbu to‘lov tasdiqlangan. Obunangiz faol.',payUrl?keyboards.tezcheckPayLink(payUrl,payment.id):keyboards.backToMenu);
+ }catch{console.error('TezCheck checkout failed');await ctx.reply('To‘lov havolasini hozir olish imkoni bo‘lmadi. Shu tugmani qayta bosing. Muammo davom etsa, xaridni menyudan qayta boshlang.');}
 }

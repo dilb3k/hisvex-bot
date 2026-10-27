@@ -1,3 +1,4 @@
+import { reconcileTezcheck } from '../../services/tezcheck';
 import type { BotContext } from "../context";
 import { texts, formatSom, formatDate, DURATION_LABEL, TIER_LABEL } from "../texts";
 import { keyboards } from "../keyboards";
@@ -51,7 +52,7 @@ export async function handleCheckPaymentStatus(ctx: BotContext, paymentId: strin
   await ctx.answerCbQuery();
 
   try {
-    const payment = await api.getPayment(paymentId);
+    let payment = await api.getPayment(paymentId);
 
     // Defense in depth: callback_data carries a raw paymentId, so confirm
     // whoever tapped this button is the Telegram user the payment actually
@@ -61,6 +62,7 @@ export async function handleCheckPaymentStatus(ctx: BotContext, paymentId: strin
       return;
     }
 
+    if(payment.method==='tezcheck')payment=await reconcileTezcheck(payment);
     await ctx.reply(texts.checkStatusResult(payment), { parse_mode: "HTML", ...keyboards.backToMenu });
   } catch (err) {
     console.error("handleCheckPaymentStatus failed", err);

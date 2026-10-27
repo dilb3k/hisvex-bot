@@ -9,7 +9,7 @@ import type { PlanDuration, PlanTier } from "../services/api-client";
 
 import { handleStart, handleContact, handleRetryLink } from "./handlers/start";
 import { handleMenuMain, handleMenuAccount, handleMenuHelp } from "./handlers/menu";
-import { handleMenuBuy, handleChooseTier, handleChooseDuration, handlePayManual, handlePayClick } from "./handlers/plans";
+import { handleMenuBuy, handleChooseTier, handleChooseDuration, handlePayManual, handlePayClick, handlePayTezcheck } from "./handlers/plans";
 import {
   handlePhoto,
   handleNoReceipt,
@@ -120,6 +120,7 @@ export function createBot(): Telegraf<BotContext> {
     handlePayManual(ctx, ctx.match[1] as PlanTier, Number(ctx.match[2]) as PlanDuration)
   );
 
+  bot.action(/^pay_tezcheck_(bor|pro)_(1|6|12)$/, ctx => handlePayTezcheck(ctx,ctx.match[1] as PlanTier,Number(ctx.match[2]) as PlanDuration));
   bot.action(/^pay_click_(bor|pro)_(1|6|12)$/, (ctx) =>
     handlePayClick(ctx, ctx.match[1] as PlanTier, Number(ctx.match[2]) as PlanDuration)
   );

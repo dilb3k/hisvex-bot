@@ -1,0 +1,5 @@
+simulation: hisvex-tezcheck
+routing: path
+mocks:
+  - routeKey: merchant
+    path: ../mocks/tezcheck/config.yaml
