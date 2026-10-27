@@ -34,7 +34,7 @@ services:
       # Must be this service's own public URL. Unset it to fall back to long
       # polling, which is what local development uses.
       - key: WEBHOOK_URL
-        value: https://hisvex-bot.onrender.com
+        value: https://hisvex-bot-encx.onrender.com
       - key: BACKEND_URL
         value: https://hisvex-api-production.up.railway.app
       - key: APP_DOWNLOAD_URL

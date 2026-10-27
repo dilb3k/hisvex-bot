@@ -16,7 +16,7 @@ const envSchema = z.object({
   // the same MongoDB Atlas cluster as BACKEND_URL — see api-client.ts's
   // failover logic. Its own BOT_INTERNAL_SECRET must match this bot's, or a
   // request that fails over there gets rejected by botAuth instead of served.
-  BACKEND_BACKUP_URL: z.string().trim().url().default("https://hisvex-api.onrender.com"),
+  BACKEND_BACKUP_URL: z.string().trim().url().default("https://comp-bar-server-bk7z.onrender.com"),
   BOT_INTERNAL_SECRET: z.string().trim().min(16, "BOT_INTERNAL_SECRET must match the backend's value"),
   CARD_NUMBER: z.string().trim().min(1),
   CARD_HOLDER_NAME: z.string().trim().min(1),
