@@ -35,7 +35,7 @@ export async function createTezcheckCheckout(input:Parameters<typeof api.createT
  const data=await tezcheckRequest('/bills',{amount_minor:Math.round(payment.amount*100),title:`Hisvex ${payment.tier.toUpperCase()} — ${payment.durationMonths} oy`,external_reference:payment.id,return_url:'https://t.me/hisvex_bot'});
  if(data.bill?.external_reference!==payment.id||data.bill?.amount_minor!==Math.round(payment.amount*100)||data.bill?.currency!=='UZS')throw new Error('Bill identity mismatch');
  payment=await api.bindTezcheckBill(payment.id,{telegramUserId:input.telegramUserId,billId:data.bill.id,payUrl:data.payment_url});
- return {payment,payUrl:payment.tezcheckPayUrl!};
+ return {payment,payUrl:payment.status==='completed'?null:payment.tezcheckPayUrl!};
 }
 export async function reconcileTezcheck(payment:Payment,billId=payment.tezcheckBillId,eventId?:string){
  if(payment.method!=='tezcheck'||!billId||!/^link_[\w-]+$/.test(billId))return payment;

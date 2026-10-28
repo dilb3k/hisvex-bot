@@ -21,7 +21,8 @@ export async function handleMenuBuy(ctx: BotContext) {
       `<b>⭐️ Pro</b>\n${texts.planFeatures(features.pro)}\n\n${texts.planPricing(pricing.pro)}\n` +
       `${texts.planDivider}\n\n` +
       texts.choosePlanFooter;
-    await respond(ctx, body, { parse_mode: "HTML", ...keyboards.choosePlan });
+    // A new purchase needs a new message identity; retries within it keep the same order key.
+    await ctx.reply(body, { parse_mode: "HTML", ...keyboards.choosePlan });
   } catch (err) {
     console.error("handleMenuBuy failed", err);
     await ctx.reply(texts.genericError);
