@@ -1,3 +1,4 @@
+import { handleMenuBuy } from "./plans";
 import { Markup } from "telegraf";
 
 import type { BotContext } from "../context";
@@ -12,6 +13,7 @@ export async function handleStart(ctx: BotContext) {
   if (ctx.chat?.type !== "private" || !ctx.from) return;
   ctx.session.awaitingCardInfoFor = undefined;
   const payload = (ctx.message as { text?: string } | undefined)?.text?.trim().split(/\s+/)[1];
+  ctx.session.pendingSubscription = payload === "obuna" || /^\/obuna(?:@\w+)?(?:\s|$)/.test((ctx.message as { text?: string })?.text ?? "");
   if (payload === "reset_password") return handlePasswordReset(ctx);
   if (payload?.startsWith("reg_")) {
     try {
@@ -35,6 +37,7 @@ export async function handleStart(ctx: BotContext) {
   const linked = await resolveLinkedUser(ctx);
   if (linked) {
     await ctx.reply(texts.welcomeBack, keyboards.persistentMenu(isAdmin(ctx.from?.id)));
+    if (ctx.session.pendingSubscription) { ctx.session.pendingSubscription = false; return handleMenuBuy(ctx); }
     return showMainMenu(ctx);
   }
   await ctx.reply(texts.welcome, { parse_mode: "HTML", ...keyboards.requestPhone });
@@ -92,7 +95,8 @@ async function linkByPhone(ctx: BotContext, phone: string) {
       parse_mode: "HTML",
       ...keyboards.persistentMenu(isAdmin(ctx.from?.id)),
     });
-    await showMainMenu(ctx);
+    if (ctx.session.pendingSubscription) { ctx.session.pendingSubscription = false; await handleMenuBuy(ctx); }
+    else await showMainMenu(ctx);
   } catch (err) {
     console.error("linkByPhone failed", err);
     await ctx.reply(texts.genericError);

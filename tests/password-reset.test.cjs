@@ -140,7 +140,7 @@ test('Telegram redelivery does not consume an entry twice or cancel an in-flight
  assert.equal(h.replies.at(-1)[0],texts.passwordResetSuccess);
 });
 test('commands, menus and callbacks exit password collection; cancel restores the menu',async()=>{
- for(const text of ['/start','/help','/cancel','/reset_password',texts.menuButtons.myAccount]) {
+ for(const text of ['/start','/help','/cancel','/reset_password','/obuna',texts.menuButtons.myAccount]) {
   const h=harness();await h.handlePasswordReset(h.ctx);await h.send(text);
   assert.equal(h.ctx.session.passwordReset,undefined);assert.equal(h.fallthrough(),1);assert.equal(h.deletions.length,0);
  }
@@ -177,7 +177,7 @@ test('production routing captures password text before receipts or phone linking
 test('reset Start deep link runs before linked-account menu or signup flow',async()=>{
  let calls=0;
  const {handleStart}=load('src/bot/handlers/start.ts',{
-  './password-reset':{handlePasswordReset:async()=>calls++},'./menu':{resolveLinkedUser:async()=>{throw Error('must not use cached linking');}},
+  './plans':{handleMenuBuy:async()=>{}},'./password-reset':{handlePasswordReset:async()=>calls++},'./menu':{resolveLinkedUser:async()=>{throw Error('must not use cached linking');}},
   '../../services/api-client':{api:{}},'../../config/env':{env:{}},'../texts':{texts:{}},'../keyboards':{keyboards:{}},
  });
  await handleStart({from:{id:123},chat:{type:'private'},session:{},message:{text:'/start reset_password'}});

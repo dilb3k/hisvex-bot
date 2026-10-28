@@ -28,6 +28,7 @@ export function createBot(): Telegraf<BotContext> {
   bot.use(passwordResetMiddleware);
 
   bot.start(handleStart);
+  bot.command("obuna", handleStart);
   bot.command("reset_password", handlePasswordReset);
   bot.command("cancel", handleCancelPasswordReset);
   bot.help((ctx) => ctx.reply(texts.help, { parse_mode: "HTML" }));

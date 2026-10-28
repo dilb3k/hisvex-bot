@@ -251,7 +251,7 @@ export const texts = {
   help:
     "🆘 <b>Yordam</b>\n\n" +
     `Savol yoki muammo bo'lsa: @${env.SUPPORT_TELEGRAM_USERNAME}\n\n` +
-    "Buyruqlar:\n/start — bosh menyu\n/reset_password — unutilgan parolni tiklash\n/help — yordam",
+    "Buyruqlar:\n/start — bosh menyu\n/obuna — obuna sotib olish\n/reset_password — unutilgan parolni tiklash\n/help — yordam",
   genericError: "❗️ Xatolik yuz berdi. Birozdan so'ng qayta urinib ko'ring yoki /help orqali murojaat qiling.",
   notAdmin: "Bu bo'lim faqat administratorlar uchun.",
   back: "◀️ Orqaga",

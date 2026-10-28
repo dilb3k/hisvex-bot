@@ -2,6 +2,7 @@ import type { Context } from "telegraf";
 import type { PlanDuration, PlanTier } from "../services/api-client";
 
 export interface SessionData {
+  pendingSubscription?: boolean;
   userId?: string;
   username?: string;
   // Set right after the user picks tier+duration and taps "Karta orqali",

@@ -90,7 +90,7 @@ export async function passwordResetMiddleware(ctx: BotContext, next: () => Promi
   if (!state && !passwordReply) return next();
   const message = ctx.message;
   const text = message && "text" in message ? message.text : undefined;
-  const navigation = !!text && (/^\/(start|help|cancel|reset_password)(?:@\w+)?(?:\s|$)/.test(text) || Object.values(texts.menuButtons).includes(text));
+  const navigation = !!text && (/^\/(start|help|cancel|reset_password|obuna)(?:@\w+)?(?:\s|$)/.test(text) || Object.values(texts.menuButtons).includes(text));
   // Telegram can redeliver an update whose response was lost. Its password
   // message has already been removed; do not delete/consume it a second time.
   if (state && text !== undefined && !navigation && message!.message_id <= (state.lastEntryMessageId ?? 0)) return;
