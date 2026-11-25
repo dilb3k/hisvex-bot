@@ -66,6 +66,14 @@ function isFailoverTriggering(error: AxiosError): boolean {
   return false;
 }
 
+// A hanging primary (accepts the connection, never answers) shows up as a
+// client timeout. That is not proof of death for a write, but replaying an
+// idempotent GET on the backup is always safe, and marking primary down makes
+// every later request skip the dead host until /api/health answers again.
+function isTimeout(error: AxiosError): boolean {
+  return !error.response && (error.code === "ECONNABORTED" || error.code === "ETIMEDOUT");
+}
+
 function isRailwayPlatformNotFound(headers: any, body: unknown): boolean {
   let appBody = body;
   if (typeof appBody === 'string') { try { appBody = JSON.parse(appBody); } catch {} }
@@ -91,7 +99,7 @@ http.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as (InternalAxiosRequestConfig & { _failoverRetried?: boolean }) | undefined;
-    if (originalRequest && !isPrimaryDown && ["get","head","options"].includes((originalRequest.method??"get").toLowerCase()) && !originalRequest._failoverRetried && isFailoverTriggering(error)) {
+    if (originalRequest && !isPrimaryDown && ["get","head","options"].includes((originalRequest.method??"get").toLowerCase()) && !originalRequest._failoverRetried && (isFailoverTriggering(error) || isTimeout(error))) {
       originalRequest._failoverRetried = true;
       markPrimaryDown();
       originalRequest.baseURL = `${BACKUP_BASE}/api/bot`;
