@@ -18,13 +18,38 @@ const HEAVY_TIMEOUT_MS = 60_000;
 let isPrimaryDown = false;
 let healthRecheckTimer: NodeJS.Timeout | null = null;
 
-function activeBase(): string {
-  return isPrimaryDown ? BACKUP_BASE : PRIMARY_BASE;
+// A recent clean /api/health vouches for primary this long; after that (and
+// on every fresh start of the bot) primary is probed before real traffic, so
+// a dead or hanging Railway costs 3s once instead of failing user requests.
+const PRIMARY_TRUST_MS = 30_000;
+const PROBE_TIMEOUT_MS = 3_000;
+let primaryTrustedUntil = 0;
+let probeInFlight: Promise<string> | null = null;
+
+async function resolveActiveBase(): Promise<string> {
+  if (isPrimaryDown) return BACKUP_BASE;
+  if (Date.now() < primaryTrustedUntil) return PRIMARY_BASE;
+  // Concurrent requests share one probe instead of each firing their own.
+  probeInFlight ??= (async () => {
+    try {
+      const res = await axios.get(`${PRIMARY_BASE}/api/health`, { timeout: PROBE_TIMEOUT_MS });
+      if (res.status === 200) {
+        primaryTrustedUntil = Date.now() + PRIMARY_TRUST_MS;
+        return PRIMARY_BASE;
+      }
+    } catch {
+      // Unreachable, timed out, or non-2xx: treated as down below.
+    }
+    markPrimaryDown();
+    return BACKUP_BASE;
+  })().finally(() => { probeInFlight = null; });
+  return probeInFlight;
 }
 
 function markPrimaryDown() {
   if (isPrimaryDown) return;
   isPrimaryDown = true;
+  primaryTrustedUntil = 0;
   scheduleHealthRecheck();
   console.warn("[api-client] Primary (Railway) unreachable — failing over to Render for this and subsequent requests.");
 }
@@ -40,6 +65,7 @@ function scheduleHealthRecheck() {
       const res = await axios.get(`${PRIMARY_BASE}/api/health`, { timeout: 5000 });
       if (res.status === 200) {
         isPrimaryDown = false;
+        primaryTrustedUntil = Date.now() + PRIMARY_TRUST_MS;
         if (healthRecheckTimer) {
           clearInterval(healthRecheckTimer);
           healthRecheckTimer = null;
@@ -87,10 +113,10 @@ const http = axios.create({
   headers: { "X-Bot-Secret": env.BOT_INTERNAL_SECRET },
 });
 
-http.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+http.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
   // Set per-request, not baked into the instance at creation, so a failover
   // that happens mid-run applies to the very next call immediately.
-  config.baseURL = `${activeBase()}/api/bot`;
+  config.baseURL = `${await resolveActiveBase()}/api/bot`;
   if (!config.timeout) config.timeout = DEFAULT_TIMEOUT_MS;
   return config;
 });
@@ -145,7 +171,7 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: numbe
 // that one was already the backup (isPrimaryDown was already true walking
 // in), there's nothing left to fall back to and the failure is real.
 async function fetchWithFailover(path: string, init: RequestInit, timeoutMs: number): Promise<Response> {
-  const firstBase = activeBase();
+  const firstBase = await resolveActiveBase();
   const replayable = ["GET","HEAD","OPTIONS"].includes((init.method??"GET").toUpperCase());
   let res: Response;
   try {

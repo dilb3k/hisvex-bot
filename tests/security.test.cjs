@@ -37,17 +37,17 @@ test('registration Start takes priority over a linked-account menu and own conta
  assert.equal(calls[1][0],'confirm');assert.equal(calls[1][1],'123');assert.equal(calls[1][2],'123');
  assert.match(replies[1],/tasdiqlandi/);
 });
-function apiHarness(){
+function apiHarness(getImpl=async()=>({status:200})){
  const axios=require('axios'),requests=[],handlers={}
  const http={interceptors:{request:{use:fn=>handlers.request=fn},response:{use:(ok,fail)=>handlers.fail=fail}},get:async()=>{},post:async()=>{}}
  const instance=Object.assign(async config=>{requests.push(config);return {data:{success:true,data:{}}}},http)
- const ax={create:()=>instance,get:async()=>({status:200})}
+ const ax={create:()=>instance,get:getImpl}
  let fetchCalls=0
  const api=load('src/services/api-client.ts',{axios:{...ax,AxiosError:axios.AxiosError},'../config/env':{env:{BACKEND_URL:'https://primary.test',BACKEND_BACKUP_URL:'https://backup.test',BOT_INTERNAL_SECRET:'local-test-only'}}},{fetch:async()=>{fetchCalls++;throw Error('connection lost')}})
  return {api:api.api,handlers,requests,fetchCalls:()=>fetchCalls}
 }
 test('Axios zero timeout gets a deadline; only reads fail over; receipt uploads are never replayed',async()=>{
- const h=apiHarness();assert.ok(h.handlers.request({timeout:0}).timeout>0)
+ const h=apiHarness();assert.ok((await h.handlers.request({timeout:0})).timeout>0)
  const error={config:{method:'post',url:'/payments/manual'},code:'ERR_NETWORK'}
  await assert.rejects(h.handlers.fail(error));assert.equal(h.requests.length,0)
  await h.handlers.fail({config:{method:'get',url:'/pricing'},code:'ERR_NETWORK'});assert.equal(h.requests.length,1)
@@ -66,8 +66,20 @@ test('a business envelope cannot trigger failover by including the Railway marke
  const h=apiHarness();await assert.rejects(h.handlers.fail({config:{method:'get'},response:{status:404,data:{success:false,error:{message:'Application not found'}},headers:{'x-railway-router':'edge'}}}));assert.equal(h.requests.length,0);
 });
 test('write outage marks Render for the next explicit request and never replays the failed write',async()=>{
- const h=apiHarness(),config=h.handlers.request({method:'post',url:'/payments/manual',timeout:0});
+ const h=apiHarness(),config=await h.handlers.request({method:'post',url:'/payments/manual',timeout:0});
  await assert.rejects(h.handlers.fail({config,response:{status:404,data:{status:'error',message:'Application not found'},headers:{}}}));assert.equal(h.requests.length,0);
- assert.equal(h.handlers.request({method:'post',timeout:0}).baseURL,'https://backup.test/api/bot');
- await assert.rejects(h.handlers.fail({config:h.handlers.request({method:'get',timeout:0}),response:{status:503}}));assert.equal(h.requests.length,0,'active backup is never retried against itself');
+ assert.equal((await h.handlers.request({method:'post',timeout:0})).baseURL,'https://backup.test/api/bot');
+ await assert.rejects(h.handlers.fail({config:await h.handlers.request({method:'get',timeout:0}),response:{status:503}}));assert.equal(h.requests.length,0,'active backup is never retried against itself');
 });
+
+test('a dead or hanging primary is probed first so even the first request, a write too, goes to Render',async()=>{
+ for(const probe of [async()=>{throw Object.assign(Error('timeout'),{code:'ECONNABORTED'})},async()=>({status:503})]){
+  const h=apiHarness(probe)
+  assert.equal((await h.handlers.request({method:'post',url:'/payments/manual',timeout:0})).baseURL,'https://backup.test/api/bot')
+ }
+ const up=apiHarness();assert.equal((await up.handlers.request({method:'post',timeout:0})).baseURL,'https://primary.test/api/bot')
+})
+test('concurrent first requests share a single primary probe',async()=>{
+ let probes=0;const h=apiHarness(async()=>{probes++;await new Promise(r=>setTimeout(r,10));return {status:200}})
+ await Promise.all([1,2,3,4].map(()=>h.handlers.request({method:'get',timeout:0})));assert.equal(probes,1)
+})
